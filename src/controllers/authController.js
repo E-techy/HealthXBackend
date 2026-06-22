@@ -7,32 +7,42 @@ const { generateJWT, generateOTP } = require('../utils/tokenUtils');
 // 1. Initial Signup (Generates OTP)
 exports.signup = async (req, res) => {
     try {
+        // Data now comes from a Multipart form
         const { email, password, name } = req.body;
-
+        
         let user = await UserAuth.findOne({ email });
         if (user) {
             return res.status(409).json({ success: false, message: "Email already registered. Please login." });
         }
 
         const otp = generateOTP();
-        const otpExpires = Date.now() + 10 * 60 * 1000; // 10 minutes
+        const otpExpires = Date.now() + 10 * 60 * 1000;
 
         user = new UserAuth({ email, passwordHash: password, otp, otpExpires });
         await user.save();
 
-        // Create initial profile
-        await UserProfile.create({ userId: user._id, name });
+        // Construct the public URL for the image (if one was uploaded)
+        let finalImageUrl = null;
+        if (req.file) {
+            // req.protocol = http or https
+            // req.get('host') = localhost:5001 (or your future domain)
+            // req.file.filename = the unique name multer generated
+            finalImageUrl = req.file ? `/public/uploads/${req.file.filename}` : null;
+        }
+
+        // Save the public URL to the UserProfile
+        await UserProfile.create({ 
+            userId: user._id, 
+            name, 
+            profileImageUri: finalImageUrl 
+        });
 
         await sendEmail(email, "Health X - Verify Your Email", `Your OTP for Health X is: ${otp}`);
 
         res.status(201).json({ success: true, message: "OTP sent to email. Please verify to complete signup." });
     } catch (error) {
-        console.error("🔥 SIGNUP CRASH:", error); // This prints the full error in your terminal
-        res.status(500).json({ 
-            success: false, 
-            message: "Server error during signup.",
-            errorDetails: error.message // This sends the error directly to Postman
-        });
+        console.error("🔥 SIGNUP CRASH:", error);
+        res.status(500).json({ success: false, message: "Server error during signup." });
     }
 };
 
@@ -59,7 +69,13 @@ exports.verifySignupOTP = async (req, res) => {
             success: true,
             message: "Email verified successfully.",
             token,
-            user: { accountId: user._id, email: user.email, name: profile.name }
+            // ADDED: Return the profilePhotoUrl to the Android app
+            user: { 
+                accountId: user._id, 
+                email: user.email, 
+                name: profile.name,
+                profilePhotoUrl: profile.profileImageUri
+            }
         });
     } catch (error) {
         res.status(500).json({ success: false, message: "Server error during verification." });
@@ -92,7 +108,13 @@ exports.login = async (req, res) => {
             success: true,
             message: "Login successful.",
             token,
-            user: { accountId: user._id, email: user.email, name: profile.name }
+            // ADDED: Return the profilePhotoUrl to the Android app
+            user: { 
+                accountId: user._id, 
+                email: user.email, 
+                name: profile.name,
+                profilePhotoUrl: profile.profileImageUri
+            }
         });
     } catch (error) {
         res.status(500).json({ success: false, message: "Server error during login." });

@@ -1,18 +1,19 @@
 const express = require('express');
 const authRoutes = require('./routes/authRoutes');
+const path = require('path'); // ADD THIS
 
 const app = express();
 
-// Middleware to parse incoming JSON payloads from Android
 app.use(express.json());
 
-// Routes
+// ADD THIS: Make the "public" folder accessible via HTTP
+app.use('/public', express.static(path.join(__dirname, '../public')));
+
 app.use('/api/auth', authRoutes);
 
-// Global Error Handler
 app.use((err, req, res, next) => {
     console.error(err.stack);
     res.status(500).json({ success: false, message: "Internal Server Error" });
 });
 
-module.exports = app;
+module.exports = app;  
