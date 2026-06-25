@@ -11,6 +11,10 @@ app.use('/public', express.static(path.join(__dirname, '../public')));
 
 app.use('/api/auth', authRoutes);
 
+// Add this near your other routes
+const notificationRoutes = require('./routes/notificationRoutes');
+app.use('/api/notifications', notificationRoutes);
+
 app.use((err, req, res, next) => {
     console.error(err.stack);
     res.status(500).json({ success: false, message: "Internal Server Error" });
