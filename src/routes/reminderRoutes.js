@@ -1,17 +1,25 @@
 const express = require('express');
 const router = express.Router();
 const reminderController = require('../controllers/reminderController');
-const { requireJWT } = require('../middlewares/authMiddleware'); // Assuming this is your auth middleware
+const { requireJWT } = require('../middlewares/authMiddleware');
 
-// Apply JWT middleware to all reminder routes
+// Security Gatekeeper
 router.use(requireJWT); 
 
+// Core Sync Engine
 router.post('/sync', reminderController.syncReminders);
-router.post('/', reminderController.createReminders);
-router.put('/:id', reminderController.updateReminder);
 
-// Optional: You likely still need these standard routes for the UI
-// router.get('/', reminderController.getAllReminders);
-// router.delete('/', reminderController.deleteReminders);
+// Advanced Fetching (Using GET with query params)
+router.get('/fetch', reminderController.getRemindersAdvanced);
+
+// Creation
+router.post('/', reminderController.createReminders);
+
+// Updating
+router.put('/bulk-update', reminderController.bulkUpdateReminders); // Bulk
+router.put('/:id', reminderController.updateReminder);              // Single
+
+// Advanced Deletion (Using POST so we can pass a complex JSON body)
+router.post('/delete-advanced', reminderController.deleteRemindersAdvanced);
 
 module.exports = router;
