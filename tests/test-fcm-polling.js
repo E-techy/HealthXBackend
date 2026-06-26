@@ -11,9 +11,9 @@ const { sendDataNotification, NOTIFICATION_TYPES } = require('../src/services/no
 // ==========================================
 const TEST_CONFIG = {
     MONGO_URI: process.env.MONGO_URI || 'mongodb://localhost:27017/healthx',
-    USER_ID: '60d5ecb8b392d700153ee000', // Replace with a valid MongoDB ObjectId from your DB
+    USER_ID: '6a3914746e530aadb98b9102', // Replace with a valid MongoDB ObjectId from your DB
     DEVICE_ID: 'android_test_device_001',
-    FCM_TOKEN: 'YOUR_ACTUAL_FCM_TOKEN_HERE', // Replace with the token printed in your Android Logcat
+    FCM_TOKEN: 'fV0JmmuynuPZY_yG_dzdCx:APA91bE43ELUVqMaqcSChbhRVdzEOaAwaZmZrpP-Kp1YHz92krFIS-rP_Q20TNGF_mvtai33oLimgx8nq7Jl8utUalpdpYyddTGh2E8SpEFggnxn9BdMOXg', // Replace with the token printed in your Android Logcat
     WAIT_TIME_MS: 60 * 1000 // 1 minute
 };
 

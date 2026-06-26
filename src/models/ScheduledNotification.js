@@ -28,9 +28,8 @@ const scheduledNotificationSchema = new mongoose.Schema({
 });
 
 // Auto-update the updatedAt epoch timestamp
-scheduledNotificationSchema.pre('save', function(next) {
+scheduledNotificationSchema.pre('save', async function() {
     this.updatedAt = Date.now();
-    next();
 });
 
 // ==========================================
