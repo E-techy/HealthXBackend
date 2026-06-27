@@ -1,18 +1,20 @@
-# HealthX Backend: Reminders & Voice API Documentation
+# HealthX Backend: Reminders, Notifications & Voice API Documentation
 
 ---
 
 # 1. Global Requirements
 
-### Base URL
+## Base URL
 
 ```text
 http://<YOUR_LOCAL_IP>:5001/api
 ```
 
-### Authentication
+---
 
-All routes below require **JWT authorization**.
+## Authentication
+
+All routes below require JWT authorization.
 
 ### Headers
 
@@ -20,6 +22,24 @@ All routes below require **JWT authorization**.
 Authorization: Bearer <YOUR_JWT_TOKEN>
 Content-Type: application/json
 ```
+
+---
+
+## Notification System Architecture
+
+The backend automatically handles push notifications.
+
+### Device Registration
+
+Android apps must register their FCM tokens via the `/devices/register` endpoint upon login or token refresh.
+
+### Scheduling
+
+Creating or updating a Reminder automatically creates a ScheduledNotification in the database.
+
+### Delivery
+
+A background worker polls the database every minute and sends data-only FCM messages to all active devices associated with the user when the `triggerDateTime` is reached.
 
 ---
 
@@ -49,6 +69,8 @@ All timestamps must be sent as **Epoch Numbers**.
 }
 ```
 
+---
+
 ### FacilityDetails
 
 ```json
@@ -62,6 +84,8 @@ All timestamps must be sent as **Epoch Numbers**.
   "googleMapsUrl": "String"
 }
 ```
+
+---
 
 ### PharmacyDetails
 
@@ -115,264 +139,8 @@ The server strictly validates payloads against these **21 categories**.
 
 Android must map its data classes to these specific fields.
 
----
-
-### MEDICATION
-
-```text
-medicineName
-genericName
-medicineForm
-mealTiming
-dosageAmount
-dosageUnit
-specificInstructions
-sideEffectsToWatch
-contraindications
-prescriptionId
-prescribingDoctorName
-associatedMedicineIds
-pharmacyDetails
-prescriptionDocument
-```
-
-### SUPPLEMENT
-
-```text
-supplementName
-brandName
-medicineForm
-purpose
-dosageAmount
-dosageUnit
-isWithFood
-cycleDurationDays
-breakDurationDays
-```
-
-### REFILL
-
-```text
-medicineName
-rxNumber
-totalPillsInBottle
-currentPillCount
-warningThreshold
-dailyConsumptionRate
-pharmacyDetails
-autoReorderWebUrl
-lastRefillDate
-```
-
-### CONSULTATION
-
-```text
-doctorName
-specialty
-doctorRegistrationId
-isTelehealth
-meetingWebUrl
-meetingPassword
-facilityDetails
-symptomsToDiscuss
-questionsForDoctor
-attachedDocuments
-```
-
-### CHECKUP
-
-```text
-checkupPackageName
-facilityDetails
-fastingRequiredHours
-preCheckupInstructions
-checkupReports
-```
-
-### LAB_TEST
-
-```text
-testName
-isHomeCollection
-homeCollectionAddress
-phlebotomistName
-facilityDetails
-preparationNotes
-expectedReportDate
-labReportDocuments
-```
-
-### THERAPY
-
-```text
-therapistName
-sessionType
-isTelehealth
-meetingWebUrl
-facilityDetails
-preSessionHomeworkNotes
-postSessionActionItems
-moodBeforeSession
-moodAfterSession
-```
-
-### VACCINATION
-
-```text
-vaccineName
-targetDisease
-manufacturerName
-batchNumber
-doseNumber
-totalDosesRequired
-nextDoseExpectedDate
-administeredByDoctorName
-facilityDetails
-vaccinationCertificate
-```
-
-### HYDRATION
-
-```text
-targetVolumeMl
-currentVolumeMl
-containerSizeMl
-beverageType
-isAutoLogOnAcknowledge
-```
-
-### NUTRITION
-
-```text
-mealType
-targetCalories
-targetProteinGrams
-targetCarbsGrams
-targetFatsGrams
-dietaryRestriction
-promptFoodLog
-```
-
-### SLEEP
-
-```text
-windDownTimeStart
-targetWakeTime
-targetSleepDurationMinutes
-ambientAudioUrl
-promptDreamLogOnWake
-promptSleepQualityLog
-```
-
-### FITNESS
-
-```text
-workoutType
-targetDurationMinutes
-intensityLevel
-location
-targetCaloriesBurn
-referenceVideoUrl
-attachedRoutineDocument
-```
-
-### MINDFULNESS
-
-```text
-practiceType
-targetDurationMinutes
-guidedAudioUrl
-promptPrePracticeMood
-promptPostPracticeMood
-```
-
-### HABIT
-
-```text
-habitName
-currentStreakDays
-longestStreakDays
-cueContext
-rewardContext
-accountabilityPartnerEmail
-```
-
-### VITALS
-
-```text
-vitalType
-measurementUnit
-requiresEquipment
-preparationInstructions
-targetNormalRangeMin
-targetNormalRangeMax
-promptLogToDatabase
-```
-
-### SYMPTOM
-
-```text
-targetSymptom
-severityScaleRequired
-promptTriggerLog
-promptReliefActionLog
-associatedRemedies
-```
-
-### CYCLE
-
-```text
-phasePrompt
-expectedPeriodStartDate
-isFertilityWindowWarning
-promptFlowLog
-promptMoodLog
-promptPhysicalSymptomLog
-```
-
-### MATERNITY
-
-```text
-currentTrimester
-pregnancyWeek
-taskType
-babyDevelopmentNotes
-promptContractionTimer
-doctorOrMidwifeDetails
-```
-
-### ELDER_CARE
-
-```text
-elderName
-careTaskType
-caregiverInstructions
-emergencyContactPhone
-promptMoodAndComfortLog
-attachedCarePlanDocument
-```
-
-### RECOVERY
-
-```text
-conditionOrSurgeryName
-daysPostOp
-taskType
-movementRestrictions
-promptPainLevelLog
-promptWoundPhotoUpload
-treatingPhysicianDetails
-```
-
-### CUSTOM
-
-```text
-customIconHexColor
-customIconName
-actionWebUrl
-customTags
-attachedDocuments
-```
+(See previous documentation for specific discriminator fields:
+MEDICATION, SUPPLEMENT, REFILL, CONSULTATION, CHECKUP, LAB_TEST, THERAPY, VACCINATION, HYDRATION, NUTRITION, SLEEP, FITNESS, MINDFULNESS, HABIT, VITALS, SYMPTOM, CYCLE, MATERNITY, ELDER_CARE, RECOVERY, CUSTOM).
 
 ---
 
@@ -380,23 +148,66 @@ attachedDocuments
 
 ---
 
-## A. Offline Auto-Sync (Primary Data Engine)
+# A. Register Device for Push Notifications (NEW)
 
-Syncs local changes up to the server, and pulls down any server changes made since the last sync.
+Registers or updates the FCM token for the user's current device.
 
-### URL
+Call this on app launch, login, or when Firebase issues a new token.
+
+## URL
 
 ```text
-/reminders/sync
+/devices/register
 ```
 
-### Method
+## Method
 
 ```http
 POST
 ```
 
-### Request Body
+## Request Body
+
+```json
+{
+  "deviceId": "android_9774d56d682e549c",
+  "deviceName": "Google Pixel 7 Pro",
+  "fcmToken": "f4Y8....ABCD_YOUR_REAL_FCM_TOKEN"
+}
+```
+
+## Success Response (200 OK)
+
+```json
+{
+  "success": true,
+  "message": "Device FCM token registered successfully.",
+  "data": {
+    "deviceId": "android_9774d56d682e549c",
+    "isActive": true
+  }
+}
+```
+
+---
+
+# B. Offline Auto-Sync (Primary Data Engine)
+
+Syncs local changes up to the server, and pulls down any server changes made since the last sync.
+
+## URL
+
+```text
+/reminders/sync
+```
+
+## Method
+
+```http
+POST
+```
+
+## Request Body
 
 ```json
 {
@@ -414,7 +225,7 @@ POST
 }
 ```
 
-### Success Response (200 OK)
+## Success Response (200 OK)
 
 ```json
 {
@@ -436,21 +247,23 @@ POST
 
 ---
 
-## B. Create Reminders (Batch)
+# C. Create Reminders (Batch)
 
-### URL
+> Note: Creating a reminder automatically schedules a push notification to be sent to all active devices for this user.
+
+## URL
 
 ```text
 /reminders
 ```
 
-### Method
+## Method
 
 ```http
 POST
 ```
 
-### Request Body
+## Request Body
 
 ```json
 {
@@ -465,7 +278,7 @@ POST
 }
 ```
 
-### Success Response (201 Created)
+## Success Response (201 Created)
 
 ```json
 {
@@ -479,21 +292,21 @@ POST
 
 ---
 
-## C. Update Single Reminder
+# D. Update Single Reminder
 
-### URL
+## URL
 
 ```text
 /reminders/:id
 ```
 
-### Method
+## Method
 
 ```http
 PUT
 ```
 
-### Request Body
+## Request Body
 
 ```json
 {
@@ -502,7 +315,7 @@ PUT
 }
 ```
 
-### Success Response (200 OK)
+## Success Response (200 OK)
 
 ```json
 {
@@ -514,21 +327,21 @@ PUT
 
 ---
 
-## D. Get All Reminders
+# E. Get All Reminders
 
-### URL
+## URL
 
 ```text
 /reminders
 ```
 
-### Method
+## Method
 
 ```http
 GET
 ```
 
-### Success Response (200 OK)
+## Success Response (200 OK)
 
 ```json
 {
@@ -539,25 +352,25 @@ GET
 
 ---
 
-## E. Generate AI Voice (Pro Feature)
+# F. Generate AI Voice (Pro Feature)
 
 Generates an MP3 for custom reminder alarms.
 
-Fails with `403` if user lacks a **PRO subscription**.
+Fails with `403` if user lacks a PRO subscription.
 
-### URL
+## URL
 
 ```text
 /voice/generate
 ```
 
-### Method
+## Method
 
 ```http
 POST
 ```
 
-### Request Body
+## Request Body
 
 ```json
 {
@@ -568,7 +381,7 @@ POST
 }
 ```
 
-### Success Response (200 OK)
+## Success Response (200 OK)
 
 ```json
 {
