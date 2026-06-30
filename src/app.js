@@ -13,7 +13,7 @@ app.use('/public', express.static(path.join(__dirname, '../public')));
 app.use('/api/auth', authRoutes);
 
 app.use('/api/auth', authRoutes);
-app.use('/api/notifications', notificationRoutes);
+
 
 // ADD THIS
 app.use('/api/subscriptions', subscriptionRoutes);

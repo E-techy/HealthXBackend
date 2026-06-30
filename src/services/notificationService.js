@@ -1,14 +1,22 @@
 const admin = require('../config/firebase');
 
-// Define standard categories to keep the app organized
+// Matches the top-level NotificationCategory enum in the Android app
 const NOTIFICATION_TYPES = {
-    TEST: 'TEST_NOTIFICATION',
-    OTP: 'OTP_VERIFICATION',
-    ADVERTISEMENT: 'PROMO_AD',
-    UPDATE: 'APP_UPDATE',
-    REMINDER: 'REMINDER_ALERT',
-    CHAT: 'NEW_CHAT_MESSAGE',
-    SYNC: 'SILENT_DATA_SYNC'
+    OTP: 'OTP',
+    NEW_DEVICE_REGISTERED: 'NEW_DEVICE_REGISTERED',
+    NEW_AI_CHAT_RECEIVED: 'NEW_AI_CHAT_RECEIVED',
+    ADVERTISEMENT: 'ADVERTISEMENT',
+    REMINDER: 'REMINDER',
+    SUBSCRIPTION: 'SUBSCRIPTION',
+    PAYMENT: 'PAYMENT',
+    DATA_SYNCING: 'DATA_SYNCING',
+    DOWNLOADING_MEDIA: 'DOWNLOADING_MEDIA',
+    FEEDBACK_REVIEW: 'FEEDBACK_REVIEW',
+    ACCOUNT_DELETION: 'ACCOUNT_DELETION',
+    ACCOUNT_LOGGED_OUT: 'ACCOUNT_LOGGED_OUT',
+    
+    // Developer utility (not strictly in the Android enum, but useful for testing scripts)
+    TEST: 'TEST' 
 };
 
 /**
