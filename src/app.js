@@ -1,6 +1,7 @@
 const express = require('express');
 const authRoutes = require('./routes/authRoutes');
-const path = require('path'); // ADD THIS
+const path = require('path'); 
+const subscriptionRoutes = require('./routes/subscriptionRoutes');
 
 const app = express();
 
@@ -10,6 +11,12 @@ app.use(express.json());
 app.use('/public', express.static(path.join(__dirname, '../public')));
 
 app.use('/api/auth', authRoutes);
+
+app.use('/api/auth', authRoutes);
+app.use('/api/notifications', notificationRoutes);
+
+// ADD THIS
+app.use('/api/subscriptions', subscriptionRoutes);
 
 // Add this near your other routes
 const notificationRoutes = require('./routes/notificationRoutes');
