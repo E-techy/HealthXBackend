@@ -15,13 +15,13 @@ const TEST_CONFIG = {
     USER_ID: '6a3914746e530aadb98b9102', 
     DEVICE_ID: 'android_test_device_001',
     FCM_TOKEN: 'fV0JmmuynuPZY_yG_dzdCx:APA91bE43ELUVqMaqcSChbhRVdzEOaAwaZmZrpP-Kp1YHz92krFIS-rP_Q20TNGF_mvtai33oLimgx8nq7Jl8utUalpdpYyddTGh2E8SpEFggnxn9BdMOXg', 
-    WAIT_TIME_MS: 30 * 1000 // Reduced to 30 seconds for faster testing
+    WAIT_TIME_MS: 10 * 1000 // Reduced to 30 seconds for faster testing
 };
 
 // Ensure your NOTIFICATION_TYPES in notificationService.js has 'SUBSCRIPTION'
 // If it doesn't, you can temporarily hardcode the string 'SUBSCRIPTION' below.
 
-async function runSubscriptionNotificationTest() {
+async function runSubscriptionNotificationTest() { 
     try {
         console.log('🔄 Connecting to MongoDB...');
         await mongoose.connect(TEST_CONFIG.MONGO_URI);
@@ -44,7 +44,7 @@ async function runSubscriptionNotificationTest() {
         const triggerTime = Date.now() + TEST_CONFIG.WAIT_TIME_MS;
         console.log(`\n⏰ Scheduling SUBSCRIPTION notification for ${new Date(triggerTime).toLocaleTimeString()} (in 30 seconds)...`);
         
-        // This payload mimics the data required by your Subscription UI/Razorpay flow
+        // This payload matches exactly what HealthXMessagingService.kt expects
         const testNotification = await ScheduledNotification.create({
             userId: TEST_CONFIG.USER_ID,
             notificationCategory: NOTIFICATION_TYPES.SUBSCRIPTION || 'SUBSCRIPTION',
@@ -52,14 +52,18 @@ async function runSubscriptionNotificationTest() {
             status: 'PENDING',
             payload: {
                 title: "Unlock HealthX Pro! 🚀",
-                body: "Get unlimited AI insights and tracking. Tap to view the Pro Yearly plan.",
+                // UPDATED: Changed from 'body' to 'smallDescription'
+                smallDescription: "Get unlimited AI insights and tracking. Tap to view the Pro Yearly plan.",
+                fullDescription:"HOLLA you are good",
+                category:"SUBSCRIPTION",
                 
                 // --- Subscription Specific Data for Android ---
-                actionType: "VIEW_PLAN", // Tells the Android app what screen to open
-                planId: "PRO_YEARLY", // Maps to your SubscriptionPlan model
-                subscriptionDbId: "65b1a2c3e4d5f6a7b8c9d0e1", // Example ObjectId of the plan
-                price: "1999",
-                billingCycle: "YEARLY"
+                // actionType: "VIEW_PLAN",
+                // planId: "PRO_YEARLY", 
+                // UPDATED: Changed from 'subscriptionDbId' to 'subscriptionId'
+                subscriptionId: "65b1a2c3e4d5f6a7b8c9d0e1", 
+                // price: "1999",
+                // billingCycle: "YEARLY"
             }
         });
         console.log(`✅ Subscription Notification saved with ID: ${testNotification._id}`);
