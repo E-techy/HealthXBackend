@@ -1,9 +1,9 @@
 const express = require('express');
 const router = express.Router();
-const { registerDevice } = require('../controllers/deviceController');
-const { authenticateToken } = require('../middlewares/authMiddleware'); // Your JWT middleware
+const { syncToken } = require('../controllers/deviceController');
+const { requireJWT } = require('../middlewares/authMiddleware'); // Verify this matches your auth middleware
 
-// POST /api/devices/register
-router.post('/register', authenticateToken, registerDevice);
+// POST /api/device/sync-token
+router.post('/sync-token', requireJWT, syncToken);
 
 module.exports = router;
