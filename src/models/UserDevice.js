@@ -2,26 +2,25 @@ const mongoose = require('mongoose');
 
 const userDeviceSchema = new mongoose.Schema({
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'UserAuth', required: true, index: true },
-    deviceId: { type: String, required: true }, // e.g., Android ANDROID_ID or iOS IDFV
-    deviceName: { type: String }, // e.g., "Samsung Galaxy S23"
+    deviceId: { type: String, required: true }, // Android ANDROID_ID or custom UUID
+    deviceName: { type: String }, 
     fcmToken: { type: String, required: true },
     
-    // Key params to keep track of working vs dead tokens
     isActive: { type: Boolean, default: true }, 
     
-    // Using Epoch numbers to match your architecture
+    // Using Epoch numbers
     installedAt: { type: Number, default: () => Date.now() },
-    lastActiveAt: { type: Number, default: () => Date.now() }
+    lastSyncTime: { type: Number, default: () => Date.now() } 
 }, { 
-    timestamps: false, // Disabling default timestamps since we use explicit Epoch numbers
+    timestamps: false, 
     versionKey: false 
 });
 
-// CRITICAL INDEX: Ensures a user only has one active token per specific device.
-// When the user logs in or refreshes their token, you can do an upsert on this combination.
+// CRITICAL INDEX: 
+// - If User A logs in on Device X, it creates/updates a document.
+// - If User B logs in on Device X, it creates a separate document (same deviceId, different userId).
+// - If User A logs in on Device Y, it creates a separate document (different deviceId, same userId).
 userDeviceSchema.index({ userId: 1, deviceId: 1 }, { unique: true });
-
-// Optional: Index to quickly find all active tokens for a specific user
 userDeviceSchema.index({ userId: 1, isActive: 1 });
 
 module.exports = mongoose.model('UserDevice', userDeviceSchema);
