@@ -2,6 +2,7 @@ const express = require('express');
 const authRoutes = require('./routes/authRoutes');
 const path = require('path'); 
 const subscriptionRoutes = require('./routes/subscriptionRoutes');
+const deviceRoutes = require('./routes/deviceRoutes');
 
 const app = express();
 
@@ -12,6 +13,8 @@ app.use('/public', express.static(path.join(__dirname, '../public')));
 
 
 app.use('/api/auth', authRoutes);
+
+app.use('/device', deviceRoutes);
 
 
 // ADD THIS

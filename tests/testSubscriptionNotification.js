@@ -13,8 +13,8 @@ const TEST_CONFIG = {
     MONGO_URI: process.env.MONGO_URI || 'mongodb://localhost:27017/healthx',
     // Replace with a valid User ID and the FCM token from your Android Logcat
     USER_ID: '6a3914746e530aadb98b9102', 
-    DEVICE_ID: 'android_test_device_001',
-    FCM_TOKEN: 'fV0JmmuynuPZY_yG_dzdCx:APA91bE43ELUVqMaqcSChbhRVdzEOaAwaZmZrpP-Kp1YHz92krFIS-rP_Q20TNGF_mvtai33oLimgx8nq7Jl8utUalpdpYyddTGh2E8SpEFggnxn9BdMOXg', 
+    DEVICE_ID: 'ca6fe8a4-c8ac-4ea7-8cb4-167b60583a97',
+    FCM_TOKEN: 'fV0JmmuynuPZY_yG_dzdCx:APA91bHO3ZMDZLUd-oQb4sjHY20wOY2pX7D-qshatApkTZ5c7Q8-xzvOfMFRYKtkWSmn1yDVqkGKw7pnw2QujPeUInJ6SSv-vK6uV4GgJlSQpOqwGmMAMgI', 
     WAIT_TIME_MS: 10 * 1000 // Reduced to 30 seconds for faster testing
 };
 
