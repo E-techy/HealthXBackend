@@ -10,7 +10,6 @@ app.use(express.json());
 // ADD THIS: Make the "public" folder accessible via HTTP
 app.use('/public', express.static(path.join(__dirname, '../public')));
 
-app.use('/api/auth', authRoutes);
 
 app.use('/api/auth', authRoutes);
 
