@@ -2,6 +2,7 @@ const SubscriptionPlan = require('../models/SubscriptionPlan');
 const Order = require('../models/Order');
 const razorpayInstance = require('../config/razorpay');
 const crypto = require('crypto');
+const UserSubscription = require('../models/UserSubscription');
 
 // Placeholder function to grant access after payment
 const addSubscriptionToUser = async (userId, subscriptionId) => {
@@ -148,5 +149,33 @@ exports.verifyPayment = async (req, res) => {
     } catch (error) {
         console.error("🔥 Payment Verification Error:", error);
         res.status(500).json({ success: false, message: "Server error during payment verification." });
+    }
+};
+
+
+// 6. Get User's Active Subscription Status (Protected)
+exports.getSubscriptionStatus = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        
+        const userSub = await UserSubscription.findOne({ userId });
+
+        // If no record exists, they are implicitly on the FREE tier
+        if (!userSub) {
+            return res.status(200).json({ 
+                success: true, 
+                status: "FREE" 
+            });
+        }
+
+        // Return the active status (PRO or ULTRA)
+        res.status(200).json({ 
+            success: true, 
+            status: userSub.status 
+        });
+
+    } catch (error) {
+        console.error("🔥 Error fetching subscription status:", error);
+        res.status(500).json({ success: false, message: "Internal server error." });
     }
 };
