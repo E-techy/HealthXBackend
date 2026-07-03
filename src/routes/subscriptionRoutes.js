@@ -21,5 +21,6 @@ router.use(requireJWT);
 router.post('/order/create', subscriptionController.createOrder);
 router.post('/order/cancel', subscriptionController.cancelOrder);
 router.post('/order/verify', subscriptionController.verifyPayment);
+router.get('/status', subscriptionController.getSubscriptionStatus);
 
 module.exports = router;

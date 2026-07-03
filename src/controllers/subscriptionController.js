@@ -6,9 +6,28 @@ const UserSubscription = require('../models/UserSubscription');
 
 // Placeholder function to grant access after payment
 const addSubscriptionToUser = async (userId, subscriptionId) => {
-    // TODO: We will build this later. 
-    // It will likely update the UserProfile or UserAuth with the active plan details.
-    console.log(`✅ Granted plan ${subscriptionId} to user ${userId}`);
+    try {
+        const plan = await SubscriptionPlan.findById(subscriptionId);
+        if (!plan) return;
+
+        // Determine the tier based on your planId naming convention 
+        // (e.g., 'PRO_YEARLY' becomes 'PRO', 'ULTRA_LIFETIME' becomes 'ULTRA')
+        let newStatus = 'PRO'; 
+        if (plan.planId.includes('ULTRA')) {
+            newStatus = 'ULTRA';
+        }
+
+        // Upsert the status in the dedicated table
+        await UserSubscription.findOneAndUpdate(
+            { userId },
+            { status: newStatus },
+            { upsert: true, new: true }
+        );
+
+        console.log(`✅ Granted ${newStatus} subscription to user ${userId}`);
+    } catch (error) {
+        console.error("🔥 Error upgrading user subscription:", error);
+    }
 };
 
 // 1. Get All Active Plans (Public)
