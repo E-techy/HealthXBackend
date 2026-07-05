@@ -3,6 +3,7 @@ const authRoutes = require('./routes/authRoutes');
 const path = require('path'); 
 const subscriptionRoutes = require('./routes/subscriptionRoutes');
 const deviceRoutes = require('./routes/deviceRoutes');
+const nutritionRoutes = require('./routes/nutritionRoutes');
 
 const app = express();
 
@@ -19,6 +20,8 @@ app.use('/device', deviceRoutes);
 
 // ADD THIS
 app.use('/api/subscriptions', subscriptionRoutes);
+
+app.use('/api/nutrition',nutritionRoutes );
 
 // Add this near your other routes
 const notificationRoutes = require('./routes/notificationRoutes');
