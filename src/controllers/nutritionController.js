@@ -1,6 +1,9 @@
 const MealEntry = require('../models/MealEntry');
 const NutritionLog = require('../models/NutritionLog');
 const UserSubscription = require('../models/UserSubscription');
+const UserProfile = require('../models/UserProfile');
+const aiService = require('../services/aiService');
+const fs = require('fs');
 
 // ==========================================
 // UTILITY FUNCTIONS
@@ -8,25 +11,19 @@ const UserSubscription = require('../models/UserSubscription');
 const getTodayDateString = () => new Date().toISOString().split('T')[0];
 
 const calculateHealthScore = (log) => {
-    // Basic logic: Start at 100, deduct points for missing/exceeding targets
     let score = 100;
-    
-    // Calorie penalty (if they exceed or drop too low)
     const calRatio = log.totalCalories / log.targetCalories;
     if (calRatio > 1.2 || calRatio < 0.5) score -= 20;
 
-    // Protein bonus/penalty
     const proRatio = log.totalProtein / log.targetProtein;
     if (proRatio < 0.5) score -= 15;
 
-    return Math.max(0, Math.min(100, Math.round(score))); // Keep between 0-100
+    return Math.max(0, Math.min(100, Math.round(score)));
 };
 
 const updateDailyLog = async (userId, date) => {
-    // 1. Fetch all meals for the day
     const meals = await MealEntry.find({ userId, date });
     
-    // 2. Sum everything up
     const totals = meals.reduce((acc, meal) => {
         acc.cals += meal.calories;
         acc.pro += meal.protein;
@@ -36,7 +33,6 @@ const updateDailyLog = async (userId, date) => {
         return acc;
     }, { cals: 0, pro: 0, carbs: 0, fat: 0, water: 0 });
 
-    // 3. Upsert the Daily Log
     const log = await NutritionLog.findOneAndUpdate(
         { userId, date },
         {
@@ -49,7 +45,6 @@ const updateDailyLog = async (userId, date) => {
         { upsert: true, new: true, setDefaultsOnInsert: true }
     );
 
-    // 4. Calculate and save the health score
     log.dailyHealthScore = calculateHealthScore(log);
     await log.save();
 
@@ -60,7 +55,6 @@ const updateDailyLog = async (userId, date) => {
 // ROUTE HANDLERS
 // ==========================================
 
-// 1. Add Manual Entry (e.g., drank 1L water, ate an apple)
 exports.addManualEntry = async (req, res) => {
     try {
         const { mealCategory, foodName, calories, protein, carbs, fat, waterVolume } = req.body;
@@ -79,58 +73,103 @@ exports.addManualEntry = async (req, res) => {
             waterVolume: waterVolume || 0
         });
 
-        // Trigger an update to the daily totals
         const updatedLog = await updateDailyLog(req.user.id, date);
-
         res.status(201).json({ success: true, entry, dailyLog: updatedLog });
     } catch (error) {
         res.status(500).json({ success: false, message: "Error adding manual entry." });
     }
 };
 
-// 2. Analyze Food Image (AI Workflow - PRO ONLY)
 exports.analyzeFoodImage = async (req, res) => {
     try {
         const userId = req.user.id;
-        const { imageUrl } = req.body;
+        
+        if (!req.file) {
+            return res.status(400).json({ success: false, message: "No image provided." });
+        }
+        
+        const imagePath = req.file.path;
+        const mimeType = req.file.mimetype;
+        const portionSize = req.body.portionSize || 100; 
+        const userProvidedApiKey = req.headers['x-gemini-api-key'];
 
-        // CHECK PRO STATUS
-        const sub = await UserSubscription.findOne({ userId });
-        if (!sub || sub.status === 'FREE') {
-            return res.status(403).json({ 
-                success: false, 
-                requiresPro: true,
-                message: "Subscribe to HealthX PRO to access AI Food Analysis." 
-            });
+        // 1. Subscription Check
+        if (!userProvidedApiKey) {
+            const sub = await UserSubscription.findOne({ userId });
+            if (!sub || sub.status === 'FREE') {
+                fs.unlinkSync(imagePath); // Clean up temp file
+                return res.status(403).json({ 
+                    success: false, 
+                    requiresPro: true,
+                    message: "Subscribe to HealthX PRO or provide your API key to access AI Food Analysis." 
+                });
+            }
         }
 
-        // FAKE AI FUNCTION (To be replaced with Gemini Vision API later)
-        const mockAiAnalysis = {
-            foodDetected: "Grilled Chicken Salad with Avocado",
-            foodScore: 92, // Highly nutritious
-            aiInsights: "Excellent source of lean protein and healthy fats. Low in simple carbs.",
-            estimatedMacrosPer100g: {
-                calories: 120,
-                protein: 15,
-                carbs: 4,
-                fat: 6
-            }
+        // 2. Gather Context (Biometrics & Today's Macros)
+        const profile = await UserProfile.findOne({ userId }) || {};
+        const userData = {
+            age: profile.vitalStats?.age,
+            weight: profile.vitalStats?.weight,
+            bloodPressure: profile.vitalStats?.bloodPressure
         };
 
-        res.status(200).json({ success: true, data: mockAiAnalysis });
+        const date = getTodayDateString();
+        let todayLog = await NutritionLog.findOne({ userId, date });
+        if (!todayLog) {
+            todayLog = { 
+                totalCalories: 0, targetCalories: 2400,
+                totalProtein: 0, targetProtein: 140,
+                totalCarbs: 0, totalFat: 0 
+            };
+        }
+
+        // 3. AI Step 1: Vision Extraction
+        const baseFoodData = await aiService.extractFoodDataFromImage(imagePath, mimeType, userProvidedApiKey);
+
+        // 4. AI Step 2: Contextual Analysis
+        const contextualData = await aiService.analyzeFoodContext(userData, todayLog, baseFoodData, portionSize, userProvidedApiKey);
+
+        // 5. Construct Final Payload
+        const finalResponse = {
+            foodDetected: baseFoodData.foodName,
+            foodCategory: baseFoodData.foodCategory,
+            isLiquid: baseFoodData.isLiquid,
+            portionAnalyzed: portionSize,
+            finalMacros: contextualData.finalMacros,
+            scores: {
+                foodQualityScore: contextualData.foodQualityScore,
+                eatRecommendationScore: contextualData.eatRecommendationScore
+            },
+            aiInsights: contextualData.aiInsights,
+            imageUrl: `/uploads/nutrition/${req.file.filename}` // Adjust based on your static serving path
+        };
+
+        res.status(200).json({ success: true, data: finalResponse });
+
     } catch (error) {
-        res.status(500).json({ success: false, message: "AI Analysis failed." });
+        console.error("AI Analysis failed:", error);
+        if (req.file && fs.existsSync(req.file.path)) {
+            fs.unlinkSync(req.file.path);
+        }
+        res.status(500).json({ success: false, message: "AI Analysis failed.", error: error.message });
     }
 };
 
-// 3. Save Analyzed Meal (User confirms AI data and portion size)
 exports.saveAnalyzedMeal = async (req, res) => {
     try {
-        const { mealCategory, foodName, imageUrl, baseMacros, portionPercentage, foodScore, aiInsights } = req.body;
+        // Updated to destructure the new payload format from the frontend
+        const { 
+            mealCategory, 
+            foodName, 
+            imageUrl, 
+            finalMacros, // Using the pre-calculated macros from the AI context step
+            foodQualityScore, 
+            aiInsights,
+            portionAnalyzed 
+        } = req.body;
+        
         const date = getTodayDateString();
-
-        // Calculate actual consumed macros based on the percentage they ate
-        const multiplier = portionPercentage / 100;
 
         const entry = await MealEntry.create({
             userId: req.user.id,
@@ -139,16 +178,18 @@ exports.saveAnalyzedMeal = async (req, res) => {
             mealCategory,
             foodName,
             imageUrl,
-            foodScore,
+            foodScore: foodQualityScore,
             aiInsights,
-            portionEaten: portionPercentage,
-            calories: baseMacros.calories * multiplier,
-            protein: baseMacros.protein * multiplier,
-            carbs: baseMacros.carbs * multiplier,
-            fat: baseMacros.fat * multiplier
+            portionEaten: portionAnalyzed,
+            calories: finalMacros.calories,
+            protein: finalMacros.proteinGrams,
+            carbs: finalMacros.carbsGrams,
+            fat: finalMacros.fatGrams,
+            waterVolume: finalMacros.waterVolumeMl || 0,
+            sugar: finalMacros.sugarGrams || 0, // Requires schema update below
+            sodium: finalMacros.sodiumMg || 0   // Requires schema update below
         });
 
-        // Update the daily aggregate
         const updatedLog = await updateDailyLog(req.user.id, date);
 
         res.status(201).json({ success: true, entry, dailyLog: updatedLog });
@@ -157,6 +198,7 @@ exports.saveAnalyzedMeal = async (req, res) => {
     }
 };
 
+// ... keep getTodaysDashboard, getNutritionGraph, and syncNutritionData exactly as they were ...
 // 4. Get Today's Dynamic Dashboard
 exports.getTodaysDashboard = async (req, res) => {
     try {
