@@ -17,6 +17,10 @@ const mealEntrySchema = new mongoose.Schema({
     carbs: { type: Number, default: 0 },   // in grams
     fat: { type: Number, default: 0 },     // in grams
     waterVolume: { type: Number, default: 0 }, // in liters/ml
+
+    sugar: { type: Number, default: 0 },
+    sodium: { type: Number, default: 0 },
+    detectedCategory: { type: String },
     
     // AI Specific Data
     foodScore: { type: Number }, // 1-100 score of how healthy this item is
