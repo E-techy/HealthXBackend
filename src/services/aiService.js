@@ -35,8 +35,8 @@ const extractFoodDataFromImage = async (imagePath, mimeType, userApiKey) => {
             }
         });
 
-        // The response format should be JSON based on our prompt instructions
-        const resultText = response.text();
+        // FIX: response.text is a property in the new SDK, not a function
+        const resultText = response.text;
         return JSON.parse(resultText);
     } catch (error) {
         console.error("Error in Vision Extraction:", error);
@@ -62,7 +62,8 @@ const analyzeFoodContext = async (userData, todayLog, extractedFood, portion, us
             }
         });
 
-        const resultText = response.text();
+        // FIX: response.text is a property in the new SDK, not a function
+        const resultText = response.text;
         return JSON.parse(resultText);
     } catch (error) {
         console.error("Error in Context Analysis:", error);
