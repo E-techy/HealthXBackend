@@ -51,25 +51,20 @@ The user is planning to consume a portion size of ${portionEaten} (grams or ml) 
 ${JSON.stringify(extractedFood, null, 2)}
 
 TASK:
-1. Calculate the final macros the user will consume based on their stated portion size (the base macros provided are per 100g/100ml).
+1. Scale the nutrients. The nutrients provided in "allExtractedNutrients" are based on 100g/100ml. You must scale EVERY nutrient found in that list based on the user's portion size of ${portionEaten}.
 2. Evaluate if they should eat this right now based on their remaining daily targets and biometrics.
 3. Assign an eatRecommendationScore (0-5, where 0 is strictly avoid, 5 is highly recommended).
 4. Assign a general foodQualityScore (0-5, rating the food's inherent healthiness regardless of user state).
 
 Respond ONLY with a valid JSON object matching this exact structure, with no markdown formatting or extra text:
 {
-    "finalMacros": {
-        "calories": Number,
-        "proteinGrams": Number,
-        "carbsGrams": Number,
-        "fatGrams": Number,
-        "sugarGrams": Number,
-        "sodiumMg": Number,
-        "waterVolumeMl": Number (Calculate if it is a liquid, otherwise 0)
+    "rawNutrients": {
+        // Output EVERY nutrient from the input, scaled to the actual portion size.
+        // e.g., "calories": Number, "protein": Number, "sodium": Number, "vitaminC": Number, etc.
     },
     "foodQualityScore": Number (0-5),
     "eatRecommendationScore": Number (0-5),
-    "aiInsights": "String (A short, personalized sentence of advice, e.g., 'This will put you over your daily sugar limit, consider a smaller portion.')"
+    "aiInsights": "String (A short, personalized sentence of advice based on their current daily progress.)"
 }
 `;
 

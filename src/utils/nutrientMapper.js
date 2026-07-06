@@ -159,7 +159,9 @@ const categorizeNutrients = (rawNutrients = {}) => {
     const categorized = { mainNutrients: {}, otherNutrients: {} };
 
     for (const [key, value] = Object.entries(rawNutrients)) {
-        if (typeof value !== 'number' || isNaN(value)) continue;
+        if (typeof value !== 'number' || isNaN(value)){ 
+            continue ;
+        };
 
         const cleanKey = key.toLowerCase().trim();
         const officialKey = SYNONYM_MAP[cleanKey] || cleanKey.replace(/\s+(.)/g, match => match[1].toUpperCase());
