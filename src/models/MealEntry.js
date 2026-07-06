@@ -2,30 +2,63 @@ const mongoose = require('mongoose');
 
 const mealEntrySchema = new mongoose.Schema({
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'UserAuth', required: true, index: true },
-    date: { type: String, required: true, index: true }, // Format: YYYY-MM-DD for easy querying
+    date: { type: String, required: true, index: true }, // YYYY-MM-DD
     timestamp: { type: Number, default: () => Date.now() },
     
     entryType: { type: String, enum: ['MANUAL', 'AI_SCAN'], required: true },
     mealCategory: { type: String, enum: ['BREAKFAST', 'LUNCH', 'DINNER', 'SNACK', 'HYDRATION'] },
     
     foodName: { type: String, required: true },
-    imageUrl: { type: String }, // Populated if AI_SCAN
+    imageUrl: { type: String },
     
-    // Core Macros consumed in this specific meal
-    calories: { type: Number, default: 0 },
-    protein: { type: Number, default: 0 }, // in grams
-    carbs: { type: Number, default: 0 },   // in grams
-    fat: { type: Number, default: 0 },     // in grams
-    waterVolume: { type: Number, default: 0 }, // in liters/ml
+    // ===============================
+    // Nutrient Maps
+    // ===============================
+    nutrients: {
+        type: Map,
+        of: Number,
+        default: {}
+    },
+    otherNutrients: {
+        type: Map,
+        of: Number,
+        default: {}
+    },
 
-    sugar: { type: Number, default: 0 },
-    sodium: { type: Number, default: 0 },
+    // ===============================
+    // Food Origin & Brand Info
+    // ===============================
+    foodSourceCategory: { 
+        type: String, 
+        enum: ['BRANDED', 'LOCAL', 'TREE_BASED', 'FARM_FRESH', 'RESTAURANT', 'UNKNOWN'],
+        default: 'UNKNOWN'
+    },
+    brandName: { type: String },
+    manufactureDate: { type: Date }, // Extracted from label if possible
+    expiryDate: { type: Date },      // Extracted from label if possible
+    barcode: { type: String },
+    countryOfOrigin: { type: String },
+
+    // ===============================
+    // Dietary Flags & Composition
+    // ===============================
+    ingredients: [{ type: String }],
+    allergens: [{ type: String }],
+    isVegetarian: { type: Boolean },
+    isVegan: { type: Boolean },
+    isGlutenFree: { type: Boolean },
+    isOrganic: { type: Boolean },
+
+    // ===============================
+    // AI Metrics
+    // ===============================
     detectedCategory: { type: String },
-    
-    // AI Specific Data
-    foodScore: { type: Number }, // 1-100 score of how healthy this item is
-    aiInsights: { type: String }, // e.g., "High in sodium, good source of fiber"
-    portionEaten: { type: Number, default: 100 } // Percentage (0-100) or grams
+    foodScore: { type: Number },
+    aiInsights: { type: String },
+    portionEaten: { type: Number, default: 100 },
+    servingSize: { type: Number, default: 100 },
+    servingUnit: { type: String, default: 'g' }
+
 }, { timestamps: true });
 
 module.exports = mongoose.model('MealEntry', mealEntrySchema);
