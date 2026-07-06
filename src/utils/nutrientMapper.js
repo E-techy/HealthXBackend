@@ -158,10 +158,11 @@ const SYNONYM_MAP = {
 const categorizeNutrients = (rawNutrients = {}) => {
     const categorized = { mainNutrients: {}, otherNutrients: {} };
 
-    for (const [key, value] = Object.entries(rawNutrients)) {
-        if (typeof value !== 'number' || isNaN(value)){ 
-            continue ;
-        };
+    for (const [key, value] of Object.entries(rawNutrients)) {
+    // Correct usage
+    if (typeof value !== 'number' || isNaN(value)) { 
+        continue; 
+    }
 
         const cleanKey = key.toLowerCase().trim();
         const officialKey = SYNONYM_MAP[cleanKey] || cleanKey.replace(/\s+(.)/g, match => match[1].toUpperCase());
