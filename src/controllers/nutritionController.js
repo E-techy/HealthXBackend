@@ -158,18 +158,31 @@ exports.analyzeFoodImage = async (req, res) => {
 
 exports.saveAnalyzedMeal = async (req, res) => {
     try {
-        // Updated to destructure the new payload format from the frontend
         const { 
             mealCategory, 
             foodName, 
             imageUrl, 
-            finalMacros, // Using the pre-calculated macros from the AI context step
+            rawNutrients, // The massive flat JSON of everything from AI
             foodQualityScore, 
             aiInsights,
-            portionAnalyzed 
+            portionAnalyzed,
+            
+            // New Meta Fields
+            brandName,
+            foodSourceCategory,
+            manufactureDate,
+            expiryDate,
+            ingredients,
+            allergens,
+            isVegetarian,
+            isVegan,
+            isGlutenFree
         } = req.body;
         
         const date = getTodayDateString();
+
+        // RUN THE MAPPER: This splits the flat list into Main and Other automatically
+        const { mainNutrients, otherNutrients } = categorizeNutrients(rawNutrients);
 
         const entry = await MealEntry.create({
             userId: req.user.id,
@@ -181,19 +194,28 @@ exports.saveAnalyzedMeal = async (req, res) => {
             foodScore: foodQualityScore,
             aiInsights,
             portionEaten: portionAnalyzed,
-            calories: finalMacros.calories,
-            protein: finalMacros.proteinGrams,
-            carbs: finalMacros.carbsGrams,
-            fat: finalMacros.fatGrams,
-            waterVolume: finalMacros.waterVolumeMl || 0,
-            sugar: finalMacros.sugarGrams || 0, // Requires schema update below
-            sodium: finalMacros.sodiumMg || 0   // Requires schema update below
+            
+            // The Buckets
+            nutrients: mainNutrients,
+            otherNutrients: otherNutrients,
+            
+            // The Metadata
+            brandName,
+            foodSourceCategory: foodSourceCategory || 'UNKNOWN',
+            manufactureDate: manufactureDate ? new Date(manufactureDate) : null,
+            expiryDate: expiryDate ? new Date(expiryDate) : null,
+            ingredients: ingredients || [],
+            allergens: allergens || [],
+            isVegetarian,
+            isVegan,
+            isGlutenFree
         });
 
         const updatedLog = await updateDailyLog(req.user.id, date);
 
         res.status(201).json({ success: true, entry, dailyLog: updatedLog });
     } catch (error) {
+        console.error("Save Meal Error:", error);
         res.status(500).json({ success: false, message: "Failed to save AI meal." });
     }
 };
