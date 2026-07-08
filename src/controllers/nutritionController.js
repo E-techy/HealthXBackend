@@ -81,10 +81,12 @@ exports.addManualEntry = async (req, res) => {
 };
 
 exports.analyzeFoodImage = async (req, res) => {
+    const logPrefix = `[AnalyzeFoodImage | User: ${req.user.id}]`;
+    console.log(`${logPrefix} Request received.`);
+
     try {
-        const userId = req.user.id;
-        
         if (!req.file) {
+            console.error(`${logPrefix} Failure: No image provided.`);
             return res.status(400).json({ success: false, message: "No image provided." });
         }
         
@@ -93,11 +95,14 @@ exports.analyzeFoodImage = async (req, res) => {
         const portionSize = req.body.portionSize || 100; 
         const userProvidedApiKey = req.headers['x-gemini-api-key'];
 
+        console.log(`${logPrefix} Image uploaded: ${imagePath}, Portion: ${portionSize}g`);
+
         // 1. Subscription Check
         if (!userProvidedApiKey) {
-            const sub = await UserSubscription.findOne({ userId });
+            const sub = await UserSubscription.findOne({ userId: req.user.id });
             if (!sub || sub.status === 'FREE') {
-                fs.unlinkSync(imagePath); // Clean up temp file
+                console.warn(`${logPrefix} Failure: User requires PRO subscription.`);
+                fs.unlinkSync(imagePath); 
                 return res.status(403).json({ 
                     success: false, 
                     requiresPro: true,
@@ -106,8 +111,9 @@ exports.analyzeFoodImage = async (req, res) => {
             }
         }
 
-        // 2. Gather Context (Biometrics & Today's Macros)
-        const profile = await UserProfile.findOne({ userId }) || {};
+        // 2. Gather Context
+        console.log(`${logPrefix} Gathering user context...`);
+        const profile = await UserProfile.findOne({ userId: req.user.id }) || {};
         const userData = {
             age: profile.vitalStats?.age,
             weight: profile.vitalStats?.weight,
@@ -115,7 +121,7 @@ exports.analyzeFoodImage = async (req, res) => {
         };
 
         const date = getTodayDateString();
-        let todayLog = await NutritionLog.findOne({ userId, date });
+        let todayLog = await NutritionLog.findOne({ userId: req.user.id, date });
         if (!todayLog) {
             todayLog = { 
                 totalCalories: 0, targetCalories: 2400,
@@ -125,30 +131,39 @@ exports.analyzeFoodImage = async (req, res) => {
         }
 
         // 3. AI Step 1: Vision Extraction
+        console.log(`${logPrefix} Executing AI Step 1 (Vision Extraction)...`);
         const baseFoodData = await aiService.extractFoodDataFromImage(imagePath, mimeType, userProvidedApiKey);
 
         // 4. AI Step 2: Contextual Analysis
+        console.log(`${logPrefix} Executing AI Step 2 (Contextual Analysis)...`);
         const contextualData = await aiService.analyzeFoodContext(userData, todayLog, baseFoodData, portionSize, userProvidedApiKey);
 
-        // 5. Construct Final Payload
+        // 5. Construct Final Payload (FIXED TO MATCH ANDROID CLASS)
         const finalResponse = {
-            foodDetected: baseFoodData.foodName,
-            foodCategory: baseFoodData.foodCategory,
-            isLiquid: baseFoodData.isLiquid,
+            foodDetected: baseFoodData.foodName || "Unknown Food",
+            foodCategory: baseFoodData.foodCategory || "UNKNOWN",
             portionAnalyzed: portionSize,
-            finalMacros: contextualData.finalMacros,
+            
+            // FIX: Map the backend rawNutrients to what Android expects (rawNutrientsExtracted)
+            rawNutrientsExtracted: contextualData.rawNutrients, 
+            
             scores: {
-                foodQualityScore: contextualData.foodQualityScore,
-                eatRecommendationScore: contextualData.eatRecommendationScore
+                foodQualityScore: contextualData.foodQualityScore || 0,
+                eatRecommendationScore: contextualData.eatRecommendationScore || 0
             },
-            aiInsights: contextualData.aiInsights,
-            imageUrl: `/uploads/nutrition/${req.file.filename}` // Adjust based on your static serving path
+            aiInsights: contextualData.aiInsights || "No insights available.",
+            
+            // FIX: Pass allergens from base extraction down to Android
+            allergens: baseFoodData.allergens || [],
+            
+            imageUrl: `/public/uploads/nutrition/${req.file.filename}` 
         };
 
+        console.log(`${logPrefix} Success: AI Analysis complete. Sending payload.`);
         res.status(200).json({ success: true, data: finalResponse });
 
     } catch (error) {
-        console.error("AI Analysis failed:", error);
+        console.error(`${logPrefix} Fatal Error:`, error);
         if (req.file && fs.existsSync(req.file.path)) {
             fs.unlinkSync(req.file.path);
         }
@@ -157,17 +172,18 @@ exports.analyzeFoodImage = async (req, res) => {
 };
 
 exports.saveAnalyzedMeal = async (req, res) => {
+    const logPrefix = `[SaveAnalyzedMeal | User: ${req.user.id}]`;
+    console.log(`${logPrefix} Request received for food: ${req.body.foodName}`);
+
     try {
         const { 
             mealCategory, 
             foodName, 
             imageUrl, 
-            rawNutrients, // The massive flat JSON of everything from AI
+            rawNutrients, 
             foodQualityScore, 
             aiInsights,
             portionAnalyzed,
-            
-            // New Meta Fields
             brandName,
             foodSourceCategory,
             manufactureDate,
@@ -181,9 +197,10 @@ exports.saveAnalyzedMeal = async (req, res) => {
         
         const date = getTodayDateString();
 
-        // RUN THE MAPPER: This splits the flat list into Main and Other automatically
+        console.log(`${logPrefix} Categorizing nutrients...`);
         const { mainNutrients, otherNutrients } = categorizeNutrients(rawNutrients);
 
+        console.log(`${logPrefix} Creating MealEntry document...`);
         const entry = await MealEntry.create({
             userId: req.user.id,
             date,
@@ -194,12 +211,8 @@ exports.saveAnalyzedMeal = async (req, res) => {
             foodScore: foodQualityScore,
             aiInsights,
             portionEaten: portionAnalyzed,
-            
-            // The Buckets
             nutrients: mainNutrients,
             otherNutrients: otherNutrients,
-            
-            // The Metadata
             brandName,
             foodSourceCategory: foodSourceCategory || 'UNKNOWN',
             manufactureDate: manufactureDate ? new Date(manufactureDate) : null,
@@ -211,11 +224,13 @@ exports.saveAnalyzedMeal = async (req, res) => {
             isGlutenFree
         });
 
+        console.log(`${logPrefix} Updating daily log totals...`);
         const updatedLog = await updateDailyLog(req.user.id, date);
 
+        console.log(`${logPrefix} Success: Meal saved and log updated.`);
         res.status(201).json({ success: true, entry, dailyLog: updatedLog });
     } catch (error) {
-        console.error("Save Meal Error:", error);
+        console.error(`${logPrefix} Fatal Error:`, error);
         res.status(500).json({ success: false, message: "Failed to save AI meal." });
     }
 };
