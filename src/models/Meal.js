@@ -45,6 +45,9 @@ const mealSchema = new mongoose.Schema({
             lng: { type: Number }
         }
     },
+    // Personalized AI Scoring
+    foodScore: { type: Number, min: 0, max: 5 }, // 0 = Bad, 5 = Completely Healthy
+    foodScoreReason: { type: String }, // AI's justification based on user's profile
 
     // AI Insights 
     aiInsights: {
