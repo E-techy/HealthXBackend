@@ -88,181 +88,139 @@ User Input Amount:
 {{USER_INPUT_AMOUNT}}
 (e.g., "I ate 2 bowls", "1 packet", or left blank.)
 
-YOUR OBJECTIVE:
+IMAGE PROCESSING RULES (CRITICAL):
+- You may receive multiple images in a single request.
+- Evaluate if multiple images show the SAME food item from different angles (e.g., the front branding of a cereal box and the back nutrition label of that same box). If they do, COMBINE their data into a SINGLE item in the foodItems array.
+- If the images show clearly DISTINCT food items (e.g., one image is a Coke bottle, another is a salmon dish, another is a separate dessert), you MUST create a SEPARATE object for each distinct item inside the foodItems array.
 
-- Identify the food, estimate its nutritional value, and categorize it.
-- Calculate a personalized foodScore (0 to 5) based strictly on how this specific food impacts THIS specific user, considering their allergies, illnesses, goals, and what they have already eaten today.
+YOUR OBJECTIVE:
+- Identify the food(s), estimate nutritional values, and categorize them.
+- Calculate a personalized foodScore (0 to 5) for EACH item based strictly on how this specific food impacts THIS specific user.
 - Output ONLY valid JSON.
 - Do not include markdown formatting like "json" code fences or any conversational text before or after the JSON object.
 
 JSON SCHEMA REQUIREMENTS
-(Your output must exactly match these keys)
+Your output must be a single JSON object containing a "mealType" and a "foodItems" array.
 
-amountTaken:
-(String)
-Estimate the amount eaten based on the image and user input (e.g., "400 grams", "1 bowl").
+Root Object:
+mealType: (String) Guess based on the food (e.g., "SNACK", "BREAKFAST", "LUNCH", "DINNER").
+foodItems: (Array of Objects) One object per distinct food item.
 
-totalQuantity:
-(String)
-The total size of the food shown (e.g., "100 grams", "500 ml"). Leave null if unknown.
+Inside Each Object in "foodItems":
 
-aiRecommendedQuantity:
-(String)
-How much of this the user should eat based on their profile.
+foodName: (String) Name of the dish or product (e.g., "Grilled Salmon", "Coca Cola").
+amountTaken: (String) Estimate the amount eaten (e.g., "400 grams", "1 bowl").
+totalQuantity: (String) The total size of the food shown (e.g., "100 grams", "500 ml"). Leave null if unknown.
+aiRecommendedQuantity: (String) How much of this the user should eat based on their profile.
+mealCategory: (String) MUST be one of: "VEG", "NON_VEG", "VEGAN", "UNKNOWN".
+physicalState: (String) MUST be one of: "SOLID", "LIQUID", "MIX".
+isOrganic: (Boolean) True only if visible on packaging. Default false.
 
-mealType:
-(String)
-Guess based on the food (e.g., "SNACK", "BREAKFAST", "LUNCH", "DINNER").
+ingredients: (Array of Strings) Guess if homemade, extract if packaged.
+allergens: (Array of Strings) Flag any allergens based on the user's allergy profile.
+chemicalsOrPreservatives: (Array of Strings) List any artificial additives.
 
-mealCategory:
-(String)
-MUST be one of:
-"VEG"
-"NON_VEG"
-"VEGAN"
-"UNKNOWN"
+CORE MACROS (MUST be Strings with units):
+totalCalories: (String) e.g., "350 kcal"
+totalProtein: (String) e.g., "25 grams"
+totalCarbs: (String) e.g., "10 grams"
+totalFat: (String) e.g., "15 grams"
+saturatedFat: (String) e.g., "3 grams"
+unsaturatedFat: (String) e.g., "10 grams"
+totalWater: (String) e.g., "50 ml"
 
-physicalState:
-(String)
-MUST be one of:
-"SOLID"
-"LIQUID"
-"MIX"
+otherNutrients: (Array of Objects)
+For vitamins, minerals, sodium, etc. Each object must contain:
+- name (String) e.g., "Sodium"
+- amount (String) e.g., "320 mg"
 
-isOrganic:
-(Boolean)
-True only if visible on packaging.
-Default false.
+nutritionValuePerUnit: (String) e.g., "per 100 grams" or "per 100 ml"
 
-ingredients:
-(Array of Strings)
-List of ingredients.
-Guess if homemade, extract if packaged.
+brandName, manufacturerInfo, manufactureDate, expiryDate, countryOfOrigin: (Strings/Dates) Extract ONLY if visible. Otherwise null.
 
-allergens:
-(Array of Strings)
-Flag any allergens, paying special attention to the user's allergy profile.
+foodScore: (Number) 0 to 5 (0 = Dangerous, 5 = Perfect for their goals).
+foodScoreReason: (String) Explain EXACTLY why this score was given for this specific item.
 
-chemicalsOrPreservatives:
-(Array of Strings)
-List any artificial additives (mostly for packaged food).
+aiInsights: (Object) Must contain:
+- whyGood: (Array of Strings)
+- whyNot: (Array of Strings)
 
-nutrients:
-(Array of Objects)
 
-Each object must contain:
-
-- name (String)
-- amount (String)
-
-Calculate based on the amountTaken.
-
-nutritionValuePerUnit:
-(String)
-Example:
-"per 100 grams"
-or
-"per 100 ml"
-
-brandName:
-(String or null)
-
-manufacturerInfo:
-(String or null)
-
-manufactureDate:
-(Date or null)
-
-expiryDate:
-(Date or null)
-
-countryOfOrigin:
-(String or null)
-
-Extract these ONLY if visible on the packaging.
-Otherwise leave them null.
-
-foodScore:
-(Number)
-Range: 0 to 5
-
-0 = Dangerous / Highly unhealthy for this user.
-5 = Perfect for their goals.
-
-foodScoreReason:
-(String)
-
-Explain EXACTLY why this score was given, referencing the user's specific goals, illnesses, allergies, or remaining daily nutrition.
-
-aiInsights:
-(Object)
-
-Must contain:
-
-whyGood:
-(Array of Strings)
-
-whyNot:
-(Array of Strings)
-
-EXAMPLE OUTPUT
-
+EXAMPLE OUTPUT:
 {
-  "amountTaken": "150 grams",
-  "totalQuantity": "150 grams",
-  "aiRecommendedQuantity": "100 grams",
   "mealType": "LUNCH",
-  "mealCategory": "VEG",
-  "physicalState": "SOLID",
-  "isOrganic": false,
-  "ingredients": [
-    "Whole wheat flour",
-    "Paneer",
-    "Spinach",
-    "Salt",
-    "Spices"
-  ],
-  "allergens": [
-    "Dairy",
-    "Gluten"
-  ],
-  "chemicalsOrPreservatives": [],
-  "nutrients": [
+  "foodItems": [
     {
-      "name": "Protein",
-      "amount": "12 grams"
+      "foodName": "Paneer Spinach Curry",
+      "amountTaken": "150 grams",
+      "totalQuantity": "150 grams",
+      "aiRecommendedQuantity": "100 grams",
+      "mealCategory": "VEG",
+      "physicalState": "MIX",
+      "isOrganic": false,
+      "ingredients": ["Paneer", "Spinach", "Salt", "Spices", "Oil"],
+      "allergens": ["Dairy"],
+      "chemicalsOrPreservatives": [],
+      "totalCalories": "220 kcal",
+      "totalProtein": "12 grams",
+      "totalCarbs": "10 grams",
+      "totalFat": "15 grams",
+      "saturatedFat": "6 grams",
+      "unsaturatedFat": "8 grams",
+      "totalWater": "40 ml",
+      "otherNutrients": [
+        { "name": "Sodium", "amount": "320 mg" },
+        { "name": "Iron", "amount": "2.5 mg" }
+      ],
+      "nutritionValuePerUnit": "per 100 grams",
+      "brandName": null,
+      "manufacturerInfo": null,
+      "manufactureDate": null,
+      "expiryDate": null,
+      "countryOfOrigin": null,
+      "foodScore": 4,
+      "foodScoreReason": "Because you are targeting HIGH_PROTEIN, the paneer is highly beneficial. However, docked 1 point due to the saturated fat content given your daily limits.",
+      "aiInsights": {
+        "whyGood": ["Excellent source of vegetarian protein.", "Spinach provides essential iron."],
+        "whyNot": ["Slightly high in saturated fats."]
+      }
     },
     {
-      "name": "Carbohydrates",
-      "amount": "30 grams"
-    },
-    {
-      "name": "Fat",
-      "amount": "8 grams"
-    },
-    {
-      "name": "Sodium",
-      "amount": "320 mg"
+      "foodName": "Coca Cola",
+      "amountTaken": "330 ml",
+      "totalQuantity": "330 ml",
+      "aiRecommendedQuantity": "0 ml",
+      "mealCategory": "VEGAN",
+      "physicalState": "LIQUID",
+      "isOrganic": false,
+      "ingredients": ["Carbonated water", "Sugar", "Caramel color", "Phosphoric acid", "Caffeine"],
+      "allergens": [],
+      "chemicalsOrPreservatives": ["Caramel color", "Phosphoric acid"],
+      "totalCalories": "139 kcal",
+      "totalProtein": "0 grams",
+      "totalCarbs": "35 grams",
+      "totalFat": "0 grams",
+      "saturatedFat": "0 grams",
+      "unsaturatedFat": "0 grams",
+      "totalWater": "300 ml",
+      "otherNutrients": [
+        { "name": "Sugar", "amount": "35 grams" },
+        { "name": "Caffeine", "amount": "32 mg" }
+      ],
+      "nutritionValuePerUnit": "per 100 ml",
+      "brandName": "Coca Cola",
+      "manufacturerInfo": "The Coca-Cola Company",
+      "manufactureDate": null,
+      "expiryDate": null,
+      "countryOfOrigin": null,
+      "foodScore": 1,
+      "foodScoreReason": "Zero nutritional value and high sugar content which works against your muscle gain goals.",
+      "aiInsights": {
+        "whyGood": ["Provides immediate simple carbohydrates (energy spike)."],
+        "whyNot": ["High in refined sugars.", "Contains phosphoric acid which can affect calcium absorption."]
+      }
     }
-  ],
-  "nutritionValuePerUnit": "per 100 grams",
-  "brandName": null,
-  "manufacturerInfo": null,
-  "manufactureDate": null,
-  "expiryDate": null,
-  "countryOfOrigin": null,
-  "foodScore": 4,
-  "foodScoreReason": "Because you are targeting HIGH_PROTEIN and currently lack 40g of protein for the day, the paneer is highly beneficial. However, docked 1 point due to the sodium content given your mild hypertension.",
-  "aiInsights": {
-    "whyGood": [
-      "Excellent source of vegetarian protein.",
-      "Spinach provides essential iron and vitamins."
-    ],
-    "whyNot": [
-      "Slightly high in sodium.",
-      "Contains gluten and dairy, which are safe for you, but heavy for digestion."
-    ]
-  }
+  ]
 }
 `;
 
