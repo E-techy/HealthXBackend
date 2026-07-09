@@ -8,10 +8,10 @@ const mealSchema = new mongoose.Schema({
     amountTaken: { type: String, required: true }, // e.g., "400grams", "1 litres"
     totalQuantity: { type: String }, // e.g., "100 grams"
     aiRecommendedQuantity: { type: String }, // e.g., "50 grams"
-    isFullyEaten: { type: Boolean, default: true }, // To track leftovers
+    isFullyEaten: { type: Boolean, default: true }, 
     
     // Meal Categorization
-    mealType: { type: String }, // e.g., "SNACK", "BREAKFAST"
+    mealType: { type: String }, 
     mealCategory: { type: String, enum: ['VEG', 'NON_VEG', 'VEGAN', 'UNKNOWN'], default: 'UNKNOWN' },
     physicalState: { type: String, enum: ['SOLID', 'LIQUID', 'MIX'] },
     isOrganic: { type: Boolean, default: false },
@@ -21,8 +21,14 @@ const mealSchema = new mongoose.Schema({
     allergens: [{ type: String }],
     chemicalsOrPreservatives: [{ type: String }],
     
-    // Nutrition mapping (String format as requested)
-    nutritionValuePerUnit: { type: String }, // e.g., "per 100 grams" or "per 100 ml"
+    // ==========================================
+    // MULTIPLE NUTRIENTS ADDED HERE
+    // ==========================================
+    nutrients: [{
+        name: { type: String, required: true }, // e.g., "Protein", "Carbs", "Sodium"
+        amount: { type: String, required: true } // e.g., "50grams", "120mg"
+    }],
+    nutritionValuePerUnit: { type: String }, // e.g., "per 100 grams"
     
     // Packaged / Commercial Food Data
     brandName: { type: String },
@@ -40,14 +46,14 @@ const mealSchema = new mongoose.Schema({
         }
     },
 
-    // AI Insights (JSON format with good/bad split)
+    // AI Insights 
     aiInsights: {
         whyGood: [{ type: String }],
         whyNot: [{ type: String }]
     },
     
     // Media
-    imageUrls: [{ type: String }] // Supports single or multiple photos
+    imageUrls: [{ type: String }] 
 
 }, { timestamps: true });
 
