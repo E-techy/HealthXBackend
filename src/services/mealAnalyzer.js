@@ -1,15 +1,12 @@
 const { GoogleGenAI } = require('@google/genai');
 const { analyzeMeal } = require('../config/prompts');
 
-// Initialize the SDK. It will automatically pick up process.env.GEMINI_API_KEY
-const ai = new GoogleGenAI({});
-
 /**
  * Helper function to safely parse JSON from AI, stripping any rogue markdown.
  */
 const extractAndParseJSON = (text) => {
     try {
-        // Remove markdown formatting if the AI ignores the prompt instructions
+        console.log('[MealAnalyzer - Utility] Stripping markdown and parsing JSON...');
         const cleanText = text.replace(/```json/gi, '').replace(/```/g, '').trim();
         return JSON.parse(cleanText);
     } catch (error) {
@@ -19,27 +16,33 @@ const extractAndParseJSON = (text) => {
 
 /**
  * Analyzes meal images and returns structured nutritional data.
- * * @param {Array} images - Array of image objects { mimeType: 'image/jpeg', data: 'base64string' }
+ * @param {Array} images - Array of image objects { mimeType: 'image/jpeg', data: 'base64string' }
  * @param {String} userInputAmount - The amount the user says they ate (e.g., "1 bowl")
  * @param {Object} dailyNutrition - The user's current daily nutrition stats
  * @param {Object} userProfile - The user's health profile, allergies, and goals
+ * @param {String} apiKey - The Gemini API Key
  * @returns {Object} { success: Boolean, data?: Object, message?: String }
  */
-const analyzeMealImages = async (images, userInputAmount, dailyNutrition, userProfile) => {
+const analyzeMealImages = async (images, userInputAmount, dailyNutrition, userProfile, apiKey) => {
     try {
-        // 1. Validate inputs
+        console.log('[MealAnalyzer - Step 1] Validating inputs and API key...');
+        if (!apiKey) {
+            return { success: false, message: 'Missing Gemini API Key.' };
+        }
         if (!images || images.length === 0) {
             return { success: false, message: 'No images provided for analysis.' };
         }
 
-        // 2. Prepare the dynamic prompt by injecting the variables
+        console.log('[MealAnalyzer - Step 2] Initializing GoogleGenAI client...');
+        const ai = new GoogleGenAI({ apiKey: apiKey });
+
+        console.log('[MealAnalyzer - Step 3] Injecting user data into the system prompt...');
         const finalPrompt = analyzeMeal
             .replace('{{USER_INPUT_AMOUNT}}', userInputAmount || 'Not specified')
             .replace('{{CURRENT_DAILY_NUTRITION_JSON}}', JSON.stringify(dailyNutrition))
             .replace('{{USER_PROFILE_JSON}}', JSON.stringify(userProfile));
 
-        // 3. Format images for the Gemini API
-        // The API requires inlineData objects with mimeType and base64 data
+        console.log(`[MealAnalyzer - Step 4] Formatting ${images.length} image(s) for the Gemini API...`);
         const imageParts = images.map(img => ({
             inlineData: {
                 mimeType: img.mimeType,
@@ -47,41 +50,36 @@ const analyzeMealImages = async (images, userInputAmount, dailyNutrition, userPr
             }
         }));
 
-        // 4. Combine prompt and images into the content array
         const contents = [finalPrompt, ...imageParts];
 
-        // 5. Call the Gemini API (using gemini-2.5-flash as it is fast and supports multimodal)
+        console.log('[MealAnalyzer - Step 5] Sending payload to gemini-2.5-flash (Awaiting response)...');
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: contents,
             config: {
-                // Enforce JSON output at the API level (highly recommended)
                 responseMimeType: "application/json",
-                // Set a reasonable temperature for analytical tasks (lower = more deterministic)
                 temperature: 0.2, 
             }
         });
 
+        console.log('[MealAnalyzer - Step 6] Response received. Extracting text payload...');
         const responseText = response.text;
 
         if (!responseText) {
             throw new Error('AI returned an empty response.');
         }
 
-        // 6. Parse and validate the JSON
+        console.log('[MealAnalyzer - Step 7] Parsing response text to structured JSON object...');
         const parsedData = extractAndParseJSON(responseText);
 
-        // 7. Return the successful payload
+        console.log('[MealAnalyzer - Step 8] Analysis complete. Returning successful payload.');
         return {
             success: true,
             data: parsedData
         };
 
     } catch (error) {
-        // Log the error for debugging purposes
-        console.error('[Meal Analyzer Error]:', error.message);
-        
-        // Return a clean error message to the client
+        console.error('[MealAnalyzer - ERROR]:', error.message);
         return {
             success: false,
             message: error.message || 'An unexpected error occurred during AI analysis.'
