@@ -164,5 +164,6 @@ EXAMPLE OUTPUT:
 
 module.exports = {
     visionExtractionPrompt,
-    contextualAnalysisPrompt
+    contextualAnalysisPrompt,
+    analyzeMeal
 };
