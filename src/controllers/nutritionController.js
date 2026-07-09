@@ -4,7 +4,7 @@ const UserSubscription = require('../models/UserSubscription');
 const UserProfile = require('../models/UserProfile');
 const aiService = require('../services/aiService');
 const fs = require('fs');
-
+const { categorizeNutrients } = require('../utils/nutrientMapper');
 // ==========================================
 // UTILITY FUNCTIONS
 // ==========================================
@@ -160,6 +160,10 @@ exports.analyzeFoodImage = async (req, res) => {
         };
 
         console.log(`${logPrefix} Success: AI Analysis complete. Sending payload.`);
+        console.log(`\n==================================================`);
+        console.log(`${logPrefix} FINAL PAYLOAD SENDING TO ANDROID:`);
+        console.log(JSON.stringify(finalResponse, null, 2));
+        console.log(`==================================================\n`);
         res.status(200).json({ success: true, data: finalResponse });
 
     } catch (error) {
