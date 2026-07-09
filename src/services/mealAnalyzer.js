@@ -10,19 +10,12 @@ const extractAndParseJSON = (text) => {
         const cleanText = text.replace(/```json/gi, '').replace(/```/g, '').trim();
         return JSON.parse(cleanText);
     } catch (error) {
+        // CRITICAL UPDATE: Log the raw text so you can debug prompt drift
+        console.error('\n[MealAnalyzer - RAW AI OUTPUT THAT FAILED PARSING]:\n', text, '\n');
         throw new Error('AI response could not be parsed into valid JSON.');
     }
 };
 
-/**
- * Analyzes meal images and returns structured nutritional data.
- * @param {Array} images - Array of image objects { mimeType: 'image/jpeg', data: 'base64string' }
- * @param {String} userInputAmount - The amount the user says they ate (e.g., "1 bowl")
- * @param {Object} dailyNutrition - The user's current daily nutrition stats
- * @param {Object} userProfile - The user's health profile, allergies, and goals
- * @param {String} apiKey - The Gemini API Key
- * @returns {Object} { success: Boolean, data?: Object, message?: String }
- */
 const analyzeMealImages = async (images, userInputAmount, dailyNutrition, userProfile, apiKey) => {
     try {
         console.log('[MealAnalyzer - Step 1] Validating inputs and API key...');
@@ -50,7 +43,8 @@ const analyzeMealImages = async (images, userInputAmount, dailyNutrition, userPr
             }
         }));
 
-        const contents = [finalPrompt, ...imageParts];
+        // CRITICAL UPDATE: Explicitly cast the prompt as a text object for the new SDK
+        const contents = [{ text: finalPrompt }, ...imageParts];
 
         console.log('[MealAnalyzer - Step 5] Sending payload to gemini-2.5-flash (Awaiting response)...');
         const response = await ai.models.generateContent({

@@ -24,7 +24,8 @@ const mockDailyNutrition = {
     targetProtein: 160
 };
 
-const mockUserInputAmount = "About 1 medium bowl";
+// Updated to reflect a potential multi-item test
+const mockUserInputAmount = "I had the whole plate and one can of soda.";
 
 /**
  * Helper to determine mimeType based on file extension
@@ -55,7 +56,6 @@ const runTest = async () => {
         console.log('\n[Test Script - Step 2] Loading images from public/tests directory...');
         const testDir = path.join(__dirname, '../public/tests');
         
-        // Check if directory exists
         if (!fs.existsSync(testDir)) {
             throw new Error(`Test directory not found at path: ${testDir}. Please create it and add test images.`);
         }
@@ -64,7 +64,7 @@ const runTest = async () => {
         const imageFiles = files.filter(file => /\.(jpg|jpeg|png|webp)$/i.test(file));
 
         if (imageFiles.length === 0) {
-            throw new Error(`No image files found in ${testDir}`);
+            throw new Error(`No image files found in ${testDir}. Add some test images!`);
         }
 
         console.log(`  -> Found ${imageFiles.length} image(s):`, imageFiles);
@@ -82,7 +82,6 @@ const runTest = async () => {
 
         console.log('\n[Test Script - Step 4] Executing analyzeMealImages service...\n');
         
-        // Execute the service
         const result = await analyzeMealImages(
             imagesPayload,
             mockUserInputAmount,
@@ -96,7 +95,12 @@ const runTest = async () => {
         console.log('==============================================\n');
 
         if (result.success) {
-            console.log('✅ [SUCCESS] AI returned valid parsed JSON:\n');
+            // CRITICAL UPDATE: Check if the AI correctly formatted the new foodItems array
+            const itemCount = result.data.foodItems ? result.data.foodItems.length : 0;
+            
+            console.log(`✅ [SUCCESS] AI returned valid parsed JSON.`);
+            console.log(`🥘 Detected ${itemCount} distinct food item(s).\n`);
+            
             console.log(JSON.stringify(result.data, null, 2));
         } else {
             console.log('❌ [FAILED] Service returned an error:\n');
@@ -108,5 +112,4 @@ const runTest = async () => {
     }
 };
 
-// Run the test
 runTest();
