@@ -1,5 +1,4 @@
 const UserSubscription = require('../models/UserSubscription');
-const UserProfile = require('../models/UserProfile');
 const DailyNutritionLog = require('../models/DailyNutritionLog');
 const Meal = require('../models/Meal');
 const { analyzeMealImages } = require('../services/mealAnalyzer');
@@ -16,13 +15,26 @@ exports.analyzeFoodImages = async (req, res) => {
     console.log(`${logPrefix} Request received at ${new Date().toISOString()}`);
 
     try {
-        // 1. Extract body parameters
-        const { apiKey, modelName, userInputAmount } = req.body;
+        // 1. Extract body parameters (including userProfile sent from the client)
+        const { apiKey, modelName, userInputAmount, userProfile } = req.body;
+        
         console.log(`${logPrefix} Extracted Body Params:`, {
             hasApiKey: !!apiKey,
             modelName: modelName || 'NOT_PROVIDED',
-            userInputAmount: userInputAmount || 'NOT_PROVIDED'
+            userInputAmount: userInputAmount || 'NOT_PROVIDED',
+            hasUserProfile: !!userProfile
         });
+
+        // Parse userProfile since multipart/form-data sends objects as stringified JSON
+        let parsedUserProfile = {};
+        if (userProfile) {
+            try {
+                parsedUserProfile = typeof userProfile === 'string' ? JSON.parse(userProfile) : userProfile;
+                console.log(`${logPrefix} Successfully parsed userProfile from request body.`);
+            } catch (err) {
+                console.warn(`${logPrefix} Warning: Failed to parse userProfile JSON. Defaulting to empty object.`);
+            }
+        }
 
         // 2. Validate Images
         if (!req.files || req.files.length === 0) {
@@ -57,10 +69,7 @@ exports.analyzeFoodImages = async (req, res) => {
             console.log(`${logPrefix} Client provided custom API Key and Model. Bypassing PRO check.`);
         }
 
-        // 4. Gather Contextual Data for AI
-        console.log(`${logPrefix} Fetching User Profile...`);
-        const userProfile = await UserProfile.findOne({ userId }) || {};
-
+        // 4. Fetch Today's Nutrition Log (From DB as requested)
         console.log(`${logPrefix} Fetching Today's Nutrition Log...`);
         const todayString = getTodayDateString();
         let dailyNutrition = await DailyNutritionLog.findOne({ userId, date: todayString });
@@ -88,7 +97,7 @@ exports.analyzeFoodImages = async (req, res) => {
             imagesPayload, 
             userInputAmount, 
             dailyNutrition, 
-            userProfile, 
+            parsedUserProfile, // Passed directly from the parsed request body
             finalApiKey, 
             finalModelName
         );
@@ -103,14 +112,12 @@ exports.analyzeFoodImages = async (req, res) => {
 
         // 7. Save to Database (Only after AI Success)
         const imageUrls = req.files.map(file => `/public/uploads/nutrition/${file.filename}`);
-        
-        // Map the parsed JSON from AI into our foodItems subdocument array
         const extractedFoodItems = aiResult.data.foodItems || []; 
 
         const newMeal = await Meal.create({
             userId,
             date: new Date(),
-            mealType: 'UNKNOWN', // Can be dynamically mapped if AI provides it, or left default
+            mealType: 'UNKNOWN',
             isFullyEaten: true,
             foodItems: extractedFoodItems,
             imageUrls: imageUrls
