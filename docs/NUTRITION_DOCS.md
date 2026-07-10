@@ -1,24 +1,21 @@
 # 🍏 HealthX Advanced Nutrition & AI Tracking API
 
-This module powers the **HealthX** cinematic nutrition experience.
+This module powers the HealthX cinematic nutrition experience.
 
-It handles raw manual inputs, AI-powered computer vision (Gemini two-step architecture), temporal graphing, and bidirectional data synchronization between the Android client and the Node.js backend.
+It handles AI-powered computer vision (Gemini 2.5 architecture) and data processing. The API has been streamlined to process image analysis, contextualize it with the user's profile and daily goals, and automatically save the resulting Meal record in a single, atomic transaction.
 
 ---
 
-## 📑 Table of Contents
+# 📑 Table of Contents
 
 - [📁 System Architecture & File Paths](#-system-architecture--file-paths)
 - [🗄️ Data Models (Database Schema)](#️-1-data-models-database-schema)
-  - [MealEntry Model](#mealentry-model-srcmodelsmealentryjs)
-  - [NutritionLog Model](#nutritionlog-model-srcmodelsnutritionlogjs)
+  - [Meal & Food Items Model](#meal--food-items-model-srcmodelsmealjs)
+  - [Daily Nutrition Log Model](#daily-nutrition-log-model-srcmodelsdailynutritionlogjs)
+  - [Nutrition Goal Model](#nutrition-goal-model-srcmodelsnutritiongoaljs)
 - [🚀 API Routes Documentation](#-2-api-routes-documentation)
-  - [2.1 Get Today's Dashboard](#21-get-todays-dashboard)
-  - [2.2 Add Manual Entry](#22-add-manual-entry)
-  - [2.3 Analyze Food Image (AI Vision - PRO ONLY)](#23-analyze-food-image-ai-vision---pro-only)
-  - [2.4 Save Analyzed Meal](#24-save-analyzed-meal)
-  - [2.5 Get Nutrition Graph Data](#25-get-nutrition-graph-data)
-  - [2.6 Sync Data (Bidirectional)](#26-sync-data-bidirectional)
+  - [2.1 Analyze Food Images (AI Vision)](#21-analyze-food-images-ai-vision)
+- [⚠️ Error Handling Guide](#️-3-error-handling-guide)
 
 ---
 
@@ -26,196 +23,103 @@ It handles raw manual inputs, AI-powered computer vision (Gemini two-step archit
 
 ## Models
 
-```
-src/models/MealEntry.js
-```
+- `src/models/Meal.js` — Tracks specific eating events, associated media, and nested arrays of individual food items consumed.
+- `src/models/DailyNutritionLog.js` — The aggregated daily ledger containing strictly typed number macros for mathematical operations and graphing.
+- `src/models/NutritionGoal.js` — Tracks user-defined nutrient targets (e.g., muscle gain, weight loss) and historical daily completions.
 
-Tracks individual food/water intakes with dynamic nutrient maps.
+## Controllers & Routes
 
-```
-src/models/NutritionLog.js
-```
-
-Aggregated daily ledger for rapid graph querying.
-
----
-
-## Controllers
-
-```
-src/controllers/nutritionController.js
-```
-
-The brain for calculating scores and processing API requests.
-
----
-
-## Services & Utilities
-
-```
-src/services/aiService.js
-```
-
-Handles direct communication with the Gemini API (Vision and Text models).
-
-```
-src/utils/nutrientMapper.js
-```
-
-Normalizes and categorizes raw AI nutrient data into specific database buckets.
-
----
-
-## Routes
-
-```
-src/routes/nutritionRoutes.js
-```
-
-Express router configuration featuring Multer for image parsing.
+- `src/controllers/nutritionController.js` — The centralized controller handling multipart form parsing, API key validation, DB queries, and AI service invocation.
+- `src/routes/nutritionRoutes.js` — Express router configuration utilizing multer for multi-image uploads.
 
 ---
 
 # 🗄️ 1. Data Models (Database Schema)
 
-## MealEntry Model (`src/models/MealEntry.js`)
+## Meal & Food Items Model (`src/models/Meal.js`)
 
-Stores highly detailed, granular data for every consumed item.
+This schema represents a single eating event (the parent) and an array of individual items detected (the children).
 
-Core macros and trace elements are split into specific Map objects to maintain clean, scalable documents.
+> **Note:** Core nutrients here are stored as **Strings** (e.g., `"15g"`) to maintain raw AI extraction fidelity.
+
+### Parent Schema
 
 | Field | Type | Required | Description |
 |--------|------|----------|-------------|
 | userId | ObjectId | Yes | Reference to UserAuth |
-| date | String | Yes | Format: YYYY-MM-DD. Used for fast chronological querying. |
-| timestamp | Number | No | Epoch timestamp of consumption. Default: Date.now(). |
-| entryType | String | Yes | Enum: MANUAL or AI_SCAN. |
-| mealCategory | String | No | Enum: BREAKFAST, LUNCH, DINNER, SNACK, HYDRATION. |
-| foodName | String | Yes | e.g., "Apple" or "Grilled Chicken Salad". |
-| imageUrl | String | No | Local or cloud URL of the image if scanned via AI. |
-| nutrientsMap | Map | No | Bucket for primary macros (calories, protein, carbs, fat, sugar, sodium). |
-| otherNutrientsMap | Map | No | Bucket for trace minerals, vitamins, amino acids. |
-| foodSourceCategory | String | No | Enum: BRANDED, LOCAL, TREE_BASED, FARM_FRESH, RESTAURANT, UNKNOWN. |
-| brandName | String | No | Extracted brand name from packaging. |
-| manufactureDate | Date | No | Extracted manufacture date. |
-| expiryDate | Date | No | Extracted expiration date. |
-| ingredients | Array | No | List of extracted ingredients. |
-| dietaryFlags | Booleans | No | Includes isVegetarian, isVegan, isGlutenFree, isOrganic. |
-| foodScore | Number | No | AI-generated health score (0-5). |
-| aiInsights | String | No | AI personalized dietary insights. |
-| portionEaten | Number | No | Amount consumed in grams or ml. Default: 100. |
+| date | Date | Yes | Default: `Date.now` |
+| mealType | String | No | e.g., `"LUNCH"`, `"DINNER"`, `"SNACK"` |
+| isFullyEaten | Boolean | No | Default: `true` |
+| foodItems | Array | Yes | Array of child `foodItemSchema` objects |
+| location | Object | No | Contains `name`, `lat`, `lng` |
+| imageUrls | Array | No | Array of strings linking to uploaded images |
+
+### foodItemSchema (Child Object inside `foodItems` array)
+
+| Field | Type | Description |
+|--------|------|-------------|
+| foodName | String | Name of detected item (e.g., `"Grilled Salmon"`) |
+| amountTaken | String | e.g., `"1 portion"`, `"200ml"` |
+| mealCategory | String | Enum: `VEG`, `NON_VEG`, `VEGAN`, `UNKNOWN` |
+| physicalState | String | Enum: `SOLID`, `LIQUID`, `MIX` |
+| ingredients / allergens | Array | Arrays of strings detected by AI |
+| totalCalories / totalProtein etc. | String | Core macros stored as strings (e.g., `"450kcal"`, `"30g"`) |
+| otherNutrients | Array | Array of objects: `[{ name: "Vitamin C", amount: "15mg" }]` |
+| foodScore | Number | AI-generated health score (0–5) |
+| aiInsights | Object | Contains arrays: `whyGood` and `whyNot` |
 
 ---
 
-## NutritionLog Model (`src/models/NutritionLog.js`)
+## Daily Nutrition Log Model (`src/models/DailyNutritionLog.js`)
 
-Aggregates the total macros and calculates the Daily Health Score.
+The daily aggregation.
 
-Optimized for the 7-day Health Score Graph.
+> **Note:** Macros here are strict **Numbers** to prevent database calculation crashes (`CastErrors`).
 
-| Field | Type | Required | Description |
-|--------|------|----------|-------------|
-| userId | ObjectId | Yes | Reference to UserAuth |
-| date | String | Yes | Format: YYYY-MM-DD (Unique per user per day). |
-| totalCalories | Number | No | Sum of calories for the day. Default: 0. |
-| totalProtein | Number | No | Sum of protein. Default: 0. |
-| totalCarbs | Number | No | Sum of carbs. Default: 0. |
-| totalFat | Number | No | Sum of fat. Default: 0. |
-| totalWater | Number | No | Sum of water. Default: 0. |
-| targetCalories | Number | No | Daily goal. Default: 2400. |
-| targetProtein | Number | No | Daily goal. Default: 140. |
-| dailyHealthScore | Number | No | Calculated score (0–100). |
+| Field | Type | Description |
+|--------|------|-------------|
+| userId / date | ObjectId / String | `date` must be `"YYYY-MM-DD"` format. Unique per user per day. |
+| basicNutrients | Array | Array of objects: `[{ name: "Protein", amount: "50grams" }]` |
+| totalCalories | Number | Sum of calories (e.g., `2400`) |
+| totalProtein / totalCarbs etc. | Number | Sum of respective macros |
+| mealsAttached | Array | Array of ObjectIds referencing Meal documents |
+
+---
+
+## Nutrition Goal Model (`src/models/NutritionGoal.js`)
+
+Tracks the user's active goals and charting data.
+
+| Field | Type | Description |
+|--------|------|-------------|
+| goalType | String | e.g., `"WEIGHT_LOSS"`, `"MUSCLE_GAIN"` |
+| targets | Array | Specific nutrient targets: `[{ nutrientName: "Protein", targetAmount: 160 }]` |
+| goalStartDate / EndDate | Date | Active timeframe for the goal |
+| progressChart | Array | Array of daily completions for the charting UI |
 
 ---
 
 # 🚀 2. API Routes Documentation
 
-**Base URL**
+**Base Server URL**
 
+```text
+http://<YOUR_SERVER_IP_OR_DOMAIN>
 ```
-http://your-server-url/api/nutrition
-```
 
-### Authentication
+## Authentication
 
-All routes require a valid JWT.
+Every request requires a valid JWT.
 
-```
+```http
 Authorization: Bearer <token>
 ```
 
 ---
 
-## 2.1 Get Today's Dashboard
+## 2.1 Analyze Food Images (AI Vision)
 
-Retrieves the high-level daily summary and chronological meal timeline.
-
-### Endpoint
-
-```http
-GET /api/nutrition/today
-```
-
-### Input
-
-None.
-
-### Success Response (200 OK)
-
-```json
-{
-  "success": true,
-  "summary": {
-    "totalCalories": 1560,
-    "totalProtein": 112,
-    "dailyHealthScore": 91
-  },
-  "meals": [
-    {
-      "foodName": "Grilled Chicken Salad",
-      "nutrients": {
-        "calories": 450,
-        "protein": 35
-      },
-      "timestamp": 1700000000000
-    }
-  ]
-}
-```
-
----
-
-## 2.2 Add Manual Entry
-
-Allows users to manually enter food macros or hydration.
-
-### Endpoint
-
-```http
-POST /api/nutrition/manual
-```
-
-### Request Body
-
-```json
-{
-  "mealCategory": "HYDRATION",
-  "foodName": "Water",
-  "waterVolume": 1.5
-}
-```
-
-### Success Response
-
-Returns the saved entry and the dynamically updated `NutritionLog`.
-
----
-
-## 2.3 Analyze Food Image (AI Vision - PRO ONLY)
-
-Processes an uploaded food image using the Gemini Vision pipeline.
-
-Verifies PRO status or accepts a personal Gemini API key.
+Uploads up to 10 images, contextualizes the user's data, analyzes the meal via Gemini, and automatically saves the resulting Meal record to the database if successful.
 
 ### Endpoint
 
@@ -225,176 +129,153 @@ POST /api/nutrition/ai/analyze
 
 ### Headers
 
-```
-Content-Type: multipart/form-data
-```
+| Header | Value |
+|---------|-------|
+| Content-Type | multipart/form-data |
+| Authorization | Bearer `<jwt_token>` |
 
-```
-x-gemini-api-key: <optional>
-```
+### Form Data (Body)
 
-### Form Data
+The Android client must send this as `multipart/form-data`.
 
-| Field | Type | Description |
-|--------|------|-------------|
-| image | File | Captured food or label photo |
-| portionSize | Number | Amount in grams or ml (Default: 100) |
+| Key | Type | Required | Description |
+|-----|------|----------|-------------|
+| images | File(s) | Yes | The image(s) to analyze. Can append multiple times for array upload (Max 10). |
+| apiKey | String | No | Custom Gemini API Key. If absent, backend checks for PRO sub. |
+| modelName | String | No | Custom Model Name (e.g., `gemini-2.5-flash`). |
+| userInputAmount | String | No | User text input (e.g., `"I ate half the plate and drank the whole coke"`). |
+| userProfile | String (JSON) | No | Stringified JSON object of the user profile so the backend doesn't have to query it. Example: `{"age":21,"allergies":["Peanuts"]}` |
 
 ### Success Response (200 OK)
+
+Returns the created `mealId`, the URLs of the saved images, and the fully parsed AI data mapped to match the Meal schema.
 
 ```json
 {
   "success": true,
+  "mealId": "65b4c9e8f1a2b3c4d5e6f7a8",
+  "imageUrls": [
+    "/public/uploads/nutrition/1700000000000-food1.jpg",
+    "/public/uploads/nutrition/1700000000005-food2.jpg"
+  ],
   "data": {
-    "foodDetected": "Coca-Cola",
-    "foodCategory": "BEVERAGE",
-    "isLiquid": true,
-    "portionAnalyzed": 330,
-    "rawNutrientsExtracted": {
-      "calories": 138.6,
-      "carbs": 34.98,
-      "sugar": 34.98,
-      "sodium": 13.2
-    },
-    "scores": {
-      "foodQualityScore": 1,
-      "eatRecommendationScore": 1
-    },
-    "aiInsights": "This 330ml portion contains nearly 35g of sugar. Consider a zero-sugar alternative.",
-    "imageUrl": "/uploads/nutrition/1700000000000-coke.jpg"
+    "foodItems": [
+      {
+        "foodName": "Grilled Chicken Salad",
+        "amountTaken": "1 full bowl",
+        "mealCategory": "NON_VEG",
+        "physicalState": "MIX",
+        "isOrganic": false,
+        "ingredients": [
+          "Chicken Breast",
+          "Lettuce",
+          "Olive Oil",
+          "Tomatoes"
+        ],
+        "allergens": [],
+        "chemicalsOrPreservatives": [],
+        "totalCalories": "450",
+        "totalProtein": "45g",
+        "totalCarbs": "12g",
+        "totalFat": "22g",
+        "otherNutrients": [
+          {
+            "name": "Vitamin C",
+            "amount": "15mg"
+          },
+          {
+            "name": "Sodium",
+            "amount": "320mg"
+          }
+        ],
+        "foodScore": 4.5,
+        "foodScoreReason": "High lean protein and healthy fats, low in complex carbs.",
+        "aiInsights": {
+          "whyGood": [
+            "Excellent source of protein for muscle recovery.",
+            "Provides healthy fats from olive oil."
+          ],
+          "whyNot": [
+            "Slightly high in sodium depending on the dressing used."
+          ]
+        }
+      }
+    ]
   }
 }
 ```
 
-### Error Response (403 Forbidden)
+---
+
+# ⚠️ 3. Error Handling Guide
+
+The Android client should be prepared to catch and display the following HTTP status codes and standard JSON error payloads.
+
+---
+
+## 400 - Bad Request (Client Error)
+
+Occurs when the client request is malformed or missing required files.
+
+```json
+{
+  "success": false,
+  "message": "At least one image is required."
+}
+```
+
+or if the upload is aborted by the client:
+
+```json
+{
+  "success": false,
+  "message": "Image upload failed, interrupted, or exceeded limits."
+}
+```
+
+---
+
+## 403 - Forbidden (Subscription/Payment Error)
+
+Occurs when the user does not provide their own `apiKey` **AND** their `UserSubscription` status is not **PRO**.
+
+**Android UI Action**
+
+Trigger a **Paywall** bottom sheet or prompt the user to go to **Settings** to add their personal API key.
 
 ```json
 {
   "success": false,
   "requiresPro": true,
-  "message": "Subscribe to HealthX PRO or provide your API key to access AI Food Analysis."
+  "message": "Subscribe to PRO or provide your own Gemini API key and model name to use this feature."
 }
 ```
 
 ---
 
-## 2.4 Save Analyzed Meal
+## 500 - Internal Server Error (AI or Server Failure)
 
-Maps the raw nutrient JSON into categorized Mongoose Maps and saves the final MealEntry.
+Occurs if the Gemini API fails, times out, or returns a response that cannot be parsed into JSON.
 
-### Endpoint
+The backend handles deleting the uploaded images automatically in this case so server storage isn't wasted.
 
-```http
-POST /api/nutrition/ai/save
-```
+**Android UI Action**
 
-### Request Body
+Show a snackbar or retry prompt.
 
 ```json
 {
-  "mealCategory": "LUNCH",
-  "foodName": "Hyderabadi Chicken Biryani",
-  "imageUrl": "/uploads/nutrition/1700000000000-biryani.jpg",
-  "foodQualityScore": 3,
-  "aiInsights": "High in protein but very calorie dense. Watch your portion.",
-  "portionAnalyzed": 1000,
-  "foodSourceCategory": "RESTAURANT",
-  "rawNutrients": {
-    "calories": 1800,
-    "protein": 90,
-    "carbs": 120,
-    "fat": 65,
-    "sodium": 1200,
-    "vitaminC": 4
-  }
+  "success": false,
+  "message": "AI response could not be parsed into valid JSON."
 }
 ```
 
-### Success Response
-
-Returns the mapped `MealEntry` and the updated `NutritionLog`.
-
----
-
-## 2.5 Get Nutrition Graph Data
-
-Returns historical nutrition records for graph visualization.
-
-### Endpoint
-
-```http
-GET /api/nutrition/graph?range=week
-```
-
-### Query Parameters
-
-| Parameter | Values |
-|-----------|--------|
-| range | week, month, year |
-
-### Success Response (200 OK)
+or
 
 ```json
 {
-  "success": true,
-  "data": [
-    {
-      "date": "2026-07-07",
-      "dailyHealthScore": 85,
-      "totalCalories": 2200
-    },
-    {
-      "date": "2026-07-08",
-      "dailyHealthScore": 91,
-      "totalCalories": 2350
-    }
-  ]
-}
-```
-
----
-
-## 2.6 Sync Data (Bidirectional)
-
-Handles the offline-first synchronization process.
-
-Android uploads locally cached entries while offline.
-
-The server validates, categorizes, recalculates historical data, and returns the authoritative daily summary.
-
-### Endpoint
-
-```http
-POST /api/nutrition/sync
-```
-
-### Request Body
-
-```json
-{
-  "localEntries": [
-    {
-      "date": "2026-07-08",
-      "entryType": "MANUAL",
-      "foodName": "Offline Snack",
-      "nutrients": {
-        "calories": 200,
-        "protein": 5
-      }
-    }
-  ]
-}
-```
-
-### Success Response (200 OK)
-
-```json
-{
-  "success": true,
-  "message": "Sync complete.",
-  "serverSummary": {
-    "totalCalories": 2550,
-    "dailyHealthScore": 88
-  }
+  "success": false,
+  "message": "An unexpected error occurred during meal analysis.",
+  "error": "Timeout or backend crash details..."
 }
 ```
