@@ -1,35 +1,4 @@
-const visionExtractionPrompt = `
-You are an expert nutritionist and computer vision system.
-Analyze the provided image of food, drink, or a nutritional label.
-Extract as much data as possible based on the label or visual estimation per 100g (for solids) or 100ml (for liquids).
 
-If scanning a label, explicitly look for Expiry Dates, Manufacture Dates, Ingredients, Allergens, and Brand names.
-
-Respond ONLY with a valid JSON object matching this exact structure, with no extra text:
-{
-    "foodName": "String",
-    "brandName": "String (or null)",
-    "foodSourceCategory": "String (Must be one of: BRANDED, LOCAL, TREE_BASED, FARM_FRESH, RESTAURANT, UNKNOWN)",
-    "manufactureDate": "String (ISO Date format if found, else null)",
-    "expiryDate": "String (ISO Date format if found, else null)",
-    "ingredients": ["String"],
-    "allergens": ["String"],
-    "isVegetarian": Boolean,
-    "isVegan": Boolean,
-    "isGlutenFree": Boolean,
-    "foodCategory": "String (e.g., BEVERAGE, SNACK, MEAL)",
-    "isLiquid": Boolean,
-    "allExtractedNutrients": {
-        "calories": Number,
-        "protein": Number,
-        "carbs": Number,
-        "fat": Number,
-        "sugar": Number,
-        "sodium": Number,
-        // Add any other trace minerals, vitamins, or aminos you detect here as Number values
-    }
-}
-`;
 
 const contextualAnalysisPrompt = (userData, todayLog, extractedFood, portionEaten) => `
 You are a personalized AI health coach.
@@ -225,7 +194,6 @@ EXAMPLE OUTPUT:
 `;
 
 module.exports = {
-    visionExtractionPrompt,
     contextualAnalysisPrompt,
     analyzeMeal
 };

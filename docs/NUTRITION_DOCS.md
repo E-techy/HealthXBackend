@@ -116,10 +116,9 @@ Authorization: Bearer <token>
 ```
 
 ---
-
 ## 2.1 Analyze Food Images (AI Vision)
 
-Uploads up to 10 images, contextualizes the user's data, analyzes the meal via Gemini, and automatically saves the resulting Meal record to the database if successful.
+Uploads up to **10 images**, contextualizes the user's data, analyzes the meal via **Gemini**, and automatically saves the resulting **Meal** record to the database if successful.
 
 ### Endpoint
 
@@ -136,67 +135,81 @@ POST /api/nutrition/ai/analyze
 
 ### Form Data (Body)
 
-The Android client must send this as `multipart/form-data`.
+The Android client must send this request as `multipart/form-data`.
 
 | Key | Type | Required | Description |
 |-----|------|----------|-------------|
-| images | File(s) | Yes | The image(s) to analyze. Can append multiple times for array upload (Max 10). |
-| apiKey | String | No | Custom Gemini API Key. If absent, backend checks for PRO sub. |
-| modelName | String | No | Custom Model Name (e.g., `gemini-2.5-flash`). |
-| userInputAmount | String | No | User text input (e.g., `"I ate half the plate and drank the whole coke"`). |
-| userProfile | String (JSON) | No | Stringified JSON object of the user profile so the backend doesn't have to query it. Example: `{"age":21,"allergies":["Peanuts"]}` |
+| images | File(s) | Yes | The image(s) to analyze. Multiple images can be uploaded by appending the field multiple times. Maximum: **10 images**. |
+| apiKey | String | No | Custom Gemini API Key. If omitted, the backend checks whether the user has an active **PRO** subscription. |
+| modelName | String | No | Custom Gemini model name (e.g. `gemini-2.5-flash`). |
+| userInputAmount | String | No | User-provided serving information (e.g. `"I ate half the plate and drank the whole coke"`). |
+| userProfile | String (JSON) | No | Stringified JSON containing the user's profile so the backend doesn't need to fetch it again. Example: `{"age":21,"allergies":["Peanuts"]}` |
 
 ### Success Response (200 OK)
 
-Returns the created `mealId`, the URLs of the saved images, and the fully parsed AI data mapped to match the Meal schema.
+Returns the newly created **Meal ID**, uploaded image URLs, and the complete AI analysis mapped directly to the **Meal** schema using the latest **analyzeMeal** Gemini prompt.
 
 ```json
 {
   "success": true,
   "mealId": "65b4c9e8f1a2b3c4d5e6f7a8",
   "imageUrls": [
-    "/public/uploads/nutrition/1700000000000-food1.jpg",
-    "/public/uploads/nutrition/1700000000005-food2.jpg"
+    "/public/uploads/nutrition/1700000000000-food1.jpg"
   ],
   "data": {
+    "mealType": "LUNCH",
     "foodItems": [
       {
-        "foodName": "Grilled Chicken Salad",
-        "amountTaken": "1 full bowl",
-        "mealCategory": "NON_VEG",
+        "foodName": "Paneer Spinach Curry",
+        "amountTaken": "150 grams",
+        "totalQuantity": "150 grams",
+        "aiRecommendedQuantity": "100 grams",
+        "mealCategory": "VEG",
         "physicalState": "MIX",
         "isOrganic": false,
         "ingredients": [
-          "Chicken Breast",
-          "Lettuce",
-          "Olive Oil",
-          "Tomatoes"
+          "Paneer",
+          "Spinach",
+          "Salt",
+          "Spices",
+          "Oil"
         ],
-        "allergens": [],
+        "allergens": [
+          "Dairy"
+        ],
         "chemicalsOrPreservatives": [],
-        "totalCalories": "450",
-        "totalProtein": "45g",
-        "totalCarbs": "12g",
-        "totalFat": "22g",
+        "totalCalories": "220 kcal",
+        "totalProtein": "12 grams",
+        "totalCarbs": "10 grams",
+        "totalFat": "15 grams",
+        "saturatedFat": "6 grams",
+        "unsaturatedFat": "8 grams",
+        "totalWater": "40 ml",
         "otherNutrients": [
           {
-            "name": "Vitamin C",
-            "amount": "15mg"
+            "name": "Sodium",
+            "amount": "320 mg"
           },
           {
-            "name": "Sodium",
-            "amount": "320mg"
+            "name": "Iron",
+            "amount": "2.5 mg"
           }
         ],
-        "foodScore": 4.5,
-        "foodScoreReason": "High lean protein and healthy fats, low in complex carbs.",
+        "nutritionValuePerUnit": "per 100 grams",
+        "brandName": null,
+        "manufacturerInfo": null,
+        "manufactureDate": null,
+        "expiryDate": null,
+        "countryOfOrigin": null,
+        "foodScore": 4,
+        "foodScoreReason": "Because you are targeting HIGH_PROTEIN, the paneer is highly beneficial. However, docked 1 point due to the saturated fat content given your daily limits.",
         "aiInsights": {
           "whyGood": [
-            "Excellent source of protein for muscle recovery.",
-            "Provides healthy fats from olive oil."
+            "Excellent source of vegetarian protein.",
+            "Spinach provides essential iron."
           ],
           "whyNot": [
-            "Slightly high in sodium depending on the dressing used."
+            "Slightly high in saturated fats."
           ]
         }
       }
@@ -209,13 +222,13 @@ Returns the created `mealId`, the URLs of the saved images, and the fully parsed
 
 # ⚠️ 3. Error Handling Guide
 
-The Android client should be prepared to catch and display the following HTTP status codes and standard JSON error payloads.
+The Android client should be prepared to catch and handle the following HTTP status codes.
 
 ---
 
 ## 400 - Bad Request (Client Error)
 
-Occurs when the client request is malformed or missing required files.
+Occurs when the request is missing required image files or the upload is interrupted.
 
 ```json
 {
@@ -224,24 +237,15 @@ Occurs when the client request is malformed or missing required files.
 }
 ```
 
-or if the upload is aborted by the client:
-
-```json
-{
-  "success": false,
-  "message": "Image upload failed, interrupted, or exceeded limits."
-}
-```
-
 ---
 
-## 403 - Forbidden (Subscription/Payment Error)
+## 403 - Forbidden (Subscription Error)
 
-Occurs when the user does not provide their own `apiKey` **AND** their `UserSubscription` status is not **PRO**.
+Occurs when the user does **not** provide their own `apiKey` **and** does **not** have an active **PRO** subscription.
 
 **Android UI Action**
 
-Trigger a **Paywall** bottom sheet or prompt the user to go to **Settings** to add their personal API key.
+Trigger a **Paywall** bottom sheet or prompt the user to add their personal Gemini API key in **Settings**.
 
 ```json
 {
@@ -253,29 +257,17 @@ Trigger a **Paywall** bottom sheet or prompt the user to go to **Settings** to a
 
 ---
 
-## 500 - Internal Server Error (AI or Server Failure)
+## 500 - Internal Server Error (AI Failure)
 
-Occurs if the Gemini API fails, times out, or returns a response that cannot be parsed into JSON.
-
-The backend handles deleting the uploaded images automatically in this case so server storage isn't wasted.
+Occurs if the Gemini API fails, times out, or returns an invalid/non-JSON response.
 
 **Android UI Action**
 
-Show a snackbar or retry prompt.
+Show a snackbar prompting the user to try taking the photo again.
 
 ```json
 {
   "success": false,
   "message": "AI response could not be parsed into valid JSON."
-}
-```
-
-or
-
-```json
-{
-  "success": false,
-  "message": "An unexpected error occurred during meal analysis.",
-  "error": "Timeout or backend crash details..."
 }
 ```
