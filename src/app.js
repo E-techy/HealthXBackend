@@ -22,7 +22,7 @@ app.use('/device', deviceRoutes);
 // ADD THIS
 app.use('/api/subscriptions', subscriptionRoutes);
 
-app.use('/api/nutrition',nutritionRoutes );
+// app.use('/api/nutrition',nutritionRoutes );
 
 // Add this near your other routes
 const notificationRoutes = require('./routes/notificationRoutes');

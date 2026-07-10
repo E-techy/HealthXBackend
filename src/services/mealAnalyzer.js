@@ -16,7 +16,7 @@ const extractAndParseJSON = (text) => {
     }
 };
 
-const analyzeMealImages = async (images, userInputAmount, dailyNutrition, userProfile, apiKey) => {
+const analyzeMealImages = async (images, userInputAmount, dailyNutrition, userProfile, apiKey, modelName) => {
     try {
         console.log('[MealAnalyzer - Step 1] Validating inputs and API key...');
         if (!apiKey) {
@@ -48,7 +48,7 @@ const analyzeMealImages = async (images, userInputAmount, dailyNutrition, userPr
 
         console.log('[MealAnalyzer - Step 5] Sending payload to gemini-2.5-flash (Awaiting response)...');
         const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
+            model: modelName,
             contents: contents,
             config: {
                 responseMimeType: "application/json",

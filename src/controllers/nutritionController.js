@@ -1,318 +1,146 @@
-const MealEntry = require('../models/MealEntry');
-const NutritionLog = require('../models/NutritionLog');
 const UserSubscription = require('../models/UserSubscription');
 const UserProfile = require('../models/UserProfile');
-const aiService = require('../services/aiService');
+const DailyNutritionLog = require('../models/DailyNutritionLog');
+const Meal = require('../models/Meal');
+const { analyzeMealImages } = require('../services/mealAnalyzer');
 const fs = require('fs');
-const { categorizeNutrients } = require('../utils/nutrientMapper');
-// ==========================================
-// UTILITY FUNCTIONS
-// ==========================================
+
+// Utility to get today's date in YYYY-MM-DD format to match DailyNutritionLog schema
 const getTodayDateString = () => new Date().toISOString().split('T')[0];
 
-const calculateHealthScore = (log) => {
-    let score = 100;
-    const calRatio = log.totalCalories / log.targetCalories;
-    if (calRatio > 1.2 || calRatio < 0.5) score -= 20;
-
-    const proRatio = log.totalProtein / log.targetProtein;
-    if (proRatio < 0.5) score -= 15;
-
-    return Math.max(0, Math.min(100, Math.round(score)));
-};
-
-const updateDailyLog = async (userId, date) => {
-    const meals = await MealEntry.find({ userId, date });
+exports.analyzeFoodImages = async (req, res) => {
+    const userId = req.user.id;
+    const logPrefix = `[NutritionController - AI Analyze | User: ${userId}]`;
     
-    const totals = meals.reduce((acc, meal) => {
-        acc.cals += meal.calories;
-        acc.pro += meal.protein;
-        acc.carbs += meal.carbs;
-        acc.fat += meal.fat;
-        acc.water += meal.waterVolume;
-        return acc;
-    }, { cals: 0, pro: 0, carbs: 0, fat: 0, water: 0 });
+    console.log(`\n${logPrefix} ================= NEW REQUEST =================`);
+    console.log(`${logPrefix} Request received at ${new Date().toISOString()}`);
 
-    const log = await NutritionLog.findOneAndUpdate(
-        { userId, date },
-        {
-            totalCalories: totals.cals,
-            totalProtein: totals.pro,
-            totalCarbs: totals.carbs,
-            totalFat: totals.fat,
-            totalWater: totals.water
-        },
-        { upsert: true, new: true, setDefaultsOnInsert: true }
-    );
-
-    log.dailyHealthScore = calculateHealthScore(log);
-    await log.save();
-
-    return log;
-};
-
-// ==========================================
-// ROUTE HANDLERS
-// ==========================================
-
-exports.addManualEntry = async (req, res) => {
     try {
-        const { mealCategory, foodName, calories, protein, carbs, fat, waterVolume } = req.body;
-        const date = getTodayDateString();
-
-        const entry = await MealEntry.create({
-            userId: req.user.id,
-            date,
-            entryType: 'MANUAL',
-            mealCategory,
-            foodName,
-            calories: calories || 0,
-            protein: protein || 0,
-            carbs: carbs || 0,
-            fat: fat || 0,
-            waterVolume: waterVolume || 0
+        // 1. Extract body parameters
+        const { apiKey, modelName, userInputAmount } = req.body;
+        console.log(`${logPrefix} Extracted Body Params:`, {
+            hasApiKey: !!apiKey,
+            modelName: modelName || 'NOT_PROVIDED',
+            userInputAmount: userInputAmount || 'NOT_PROVIDED'
         });
 
-        const updatedLog = await updateDailyLog(req.user.id, date);
-        res.status(201).json({ success: true, entry, dailyLog: updatedLog });
-    } catch (error) {
-        res.status(500).json({ success: false, message: "Error adding manual entry." });
-    }
-};
-
-exports.analyzeFoodImage = async (req, res) => {
-    const logPrefix = `[AnalyzeFoodImage | User: ${req.user.id}]`;
-    console.log(`${logPrefix} Request received.`);
-
-    try {
-        if (!req.file) {
-            console.error(`${logPrefix} Failure: No image provided.`);
-            return res.status(400).json({ success: false, message: "No image provided." });
+        // 2. Validate Images
+        if (!req.files || req.files.length === 0) {
+            console.warn(`${logPrefix} Failure: No images provided in request.`);
+            return res.status(400).json({ success: false, message: "At least one image is required." });
         }
-        
-        const imagePath = req.file.path;
-        const mimeType = req.file.mimetype;
-        const portionSize = req.body.portionSize || 100; 
-        const userProvidedApiKey = req.headers['x-gemini-api-key'];
+        console.log(`${logPrefix} Received ${req.files.length} image(s).`);
 
-        console.log(`${logPrefix} Image uploaded: ${imagePath}, Portion: ${portionSize}g`);
+        // 3. Subscription & API Key Logic
+        let finalApiKey = apiKey;
+        let finalModelName = modelName;
 
-        // 1. Subscription Check
-        if (!userProvidedApiKey) {
-            const sub = await UserSubscription.findOne({ userId: req.user.id });
-            if (!sub || sub.status === 'FREE') {
-                console.warn(`${logPrefix} Failure: User requires PRO subscription.`);
-                fs.unlinkSync(imagePath); 
+        if (!finalApiKey || !finalModelName) {
+            console.log(`${logPrefix} Missing client API Key or Model. Checking PRO subscription...`);
+            const sub = await UserSubscription.findOne({ userId });
+            
+            if (!sub || sub.status !== 'PRO') {
+                console.warn(`${logPrefix} Access Denied: User is not PRO and did not provide custom API keys.`);
+                // Clean up uploaded files before aborting
+                req.files.forEach(file => fs.unlinkSync(file.path));
                 return res.status(403).json({ 
                     success: false, 
                     requiresPro: true,
-                    message: "Subscribe to HealthX PRO or provide your API key to access AI Food Analysis." 
+                    message: "Subscribe to PRO or provide your own Gemini API key and model name to use this feature." 
                 });
             }
+            
+            console.log(`${logPrefix} User is PRO. Using internal environment keys.`);
+            finalApiKey = process.env.GEMINI_API_KEY;
+            finalModelName = process.env.GEMINI_VISION_MODEL || 'gemini-2.5-flash';
+        } else {
+            console.log(`${logPrefix} Client provided custom API Key and Model. Bypassing PRO check.`);
         }
 
-        // 2. Gather Context
-        console.log(`${logPrefix} Gathering user context...`);
-        const profile = await UserProfile.findOne({ userId: req.user.id }) || {};
-        const userData = {
-            age: profile.vitalStats?.age,
-            weight: profile.vitalStats?.weight,
-            bloodPressure: profile.vitalStats?.bloodPressure
-        };
+        // 4. Gather Contextual Data for AI
+        console.log(`${logPrefix} Fetching User Profile...`);
+        const userProfile = await UserProfile.findOne({ userId }) || {};
 
-        const date = getTodayDateString();
-        let todayLog = await NutritionLog.findOne({ userId: req.user.id, date });
-        if (!todayLog) {
-            todayLog = { 
-                totalCalories: 0, targetCalories: 2400,
-                totalProtein: 0, targetProtein: 140,
-                totalCarbs: 0, totalFat: 0 
+        console.log(`${logPrefix} Fetching Today's Nutrition Log...`);
+        const todayString = getTodayDateString();
+        let dailyNutrition = await DailyNutritionLog.findOne({ userId, date: todayString });
+        
+        if (!dailyNutrition) {
+            console.log(`${logPrefix} No daily log found for today. Supplying empty template.`);
+            dailyNutrition = {
+                totalCalories: 0, totalProtein: 0, totalCarbs: 0, totalFat: 0
             };
         }
 
-        // 3. AI Step 1: Vision Extraction
-        console.log(`${logPrefix} Executing AI Step 1 (Vision Extraction)...`);
-        const baseFoodData = await aiService.extractFoodDataFromImage(imagePath, mimeType, userProvidedApiKey);
-
-        // 4. AI Step 2: Contextual Analysis
-        console.log(`${logPrefix} Executing AI Step 2 (Contextual Analysis)...`);
-        const contextualData = await aiService.analyzeFoodContext(userData, todayLog, baseFoodData, portionSize, userProvidedApiKey);
-
-        // 5. Construct Final Payload (FIXED TO MATCH ANDROID CLASS)
-        const finalResponse = {
-            foodDetected: baseFoodData.foodName || "Unknown Food",
-            foodCategory: baseFoodData.foodCategory || "UNKNOWN",
-            portionAnalyzed: portionSize,
-            
-            // FIX: Map the backend rawNutrients to what Android expects (rawNutrientsExtracted)
-            rawNutrientsExtracted: contextualData.rawNutrients, 
-            
-            scores: {
-                foodQualityScore: contextualData.foodQualityScore || 0,
-                eatRecommendationScore: contextualData.eatRecommendationScore || 0
-            },
-            aiInsights: contextualData.aiInsights || "No insights available.",
-            
-            // FIX: Pass allergens from base extraction down to Android
-            allergens: baseFoodData.allergens || [],
-            
-            imageUrl: `/public/uploads/nutrition/${req.file.filename}` 
-        };
-
-        console.log(`${logPrefix} Success: AI Analysis complete. Sending payload.`);
-        console.log(`\n==================================================`);
-        console.log(`${logPrefix} FINAL PAYLOAD SENDING TO ANDROID:`);
-        console.log(JSON.stringify(finalResponse, null, 2));
-        console.log(`==================================================\n`);
-        res.status(200).json({ success: true, data: finalResponse });
-
-    } catch (error) {
-        console.error(`${logPrefix} Fatal Error:`, error);
-        if (req.file && fs.existsSync(req.file.path)) {
-            fs.unlinkSync(req.file.path);
-        }
-        res.status(500).json({ success: false, message: "AI Analysis failed.", error: error.message });
-    }
-};
-
-exports.saveAnalyzedMeal = async (req, res) => {
-    const logPrefix = `[SaveAnalyzedMeal | User: ${req.user.id}]`;
-    console.log(`${logPrefix} Request received for food: ${req.body.foodName}`);
-
-    try {
-        const { 
-            mealCategory, 
-            foodName, 
-            imageUrl, 
-            rawNutrients, 
-            foodQualityScore, 
-            aiInsights,
-            portionAnalyzed,
-            brandName,
-            foodSourceCategory,
-            manufactureDate,
-            expiryDate,
-            ingredients,
-            allergens,
-            isVegetarian,
-            isVegan,
-            isGlutenFree
-        } = req.body;
-        
-        const date = getTodayDateString();
-
-        console.log(`${logPrefix} Categorizing nutrients...`);
-        const { mainNutrients, otherNutrients } = categorizeNutrients(rawNutrients);
-
-        console.log(`${logPrefix} Creating MealEntry document...`);
-        const entry = await MealEntry.create({
-            userId: req.user.id,
-            date,
-            entryType: 'AI_SCAN',
-            mealCategory,
-            foodName,
-            imageUrl,
-            foodScore: foodQualityScore,
-            aiInsights,
-            portionEaten: portionAnalyzed,
-            nutrients: mainNutrients,
-            otherNutrients: otherNutrients,
-            brandName,
-            foodSourceCategory: foodSourceCategory || 'UNKNOWN',
-            manufactureDate: manufactureDate ? new Date(manufactureDate) : null,
-            expiryDate: expiryDate ? new Date(expiryDate) : null,
-            ingredients: ingredients || [],
-            allergens: allergens || [],
-            isVegetarian,
-            isVegan,
-            isGlutenFree
+        // 5. Process Images for AI (Convert to Base64)
+        console.log(`${logPrefix} Converting ${req.files.length} image(s) to Base64 buffers...`);
+        const imagesPayload = req.files.map(file => {
+            const fileBuffer = fs.readFileSync(file.path);
+            return {
+                mimeType: file.mimetype,
+                data: fileBuffer.toString('base64')
+            };
         });
 
-        console.log(`${logPrefix} Updating daily log totals...`);
-        const updatedLog = await updateDailyLog(req.user.id, date);
+        // 6. Execute AI Analysis
+        console.log(`${logPrefix} Triggering AI Service...`);
+        const aiResult = await analyzeMealImages(
+            imagesPayload, 
+            userInputAmount, 
+            dailyNutrition, 
+            userProfile, 
+            finalApiKey, 
+            finalModelName
+        );
 
-        console.log(`${logPrefix} Success: Meal saved and log updated.`);
-        res.status(201).json({ success: true, entry, dailyLog: updatedLog });
-    } catch (error) {
-        console.error(`${logPrefix} Fatal Error:`, error);
-        res.status(500).json({ success: false, message: "Failed to save AI meal." });
-    }
-};
-
-// ... keep getTodaysDashboard, getNutritionGraph, and syncNutritionData exactly as they were ...
-// 4. Get Today's Dynamic Dashboard
-exports.getTodaysDashboard = async (req, res) => {
-    try {
-        const userId = req.user.id;
-        const date = getTodayDateString();
-
-        // Get the high-level summary
-        let dailySummary = await NutritionLog.findOne({ userId, date });
-        if (!dailySummary) {
-            // Return empty layout if nothing logged yet
-            dailySummary = { totalCalories: 0, dailyHealthScore: 0 }; 
+        if (!aiResult.success) {
+            console.error(`${logPrefix} AI Analysis Failed:`, aiResult.message);
+            req.files.forEach(file => fs.unlinkSync(file.path)); // Cleanup
+            return res.status(500).json({ success: false, message: aiResult.message });
         }
 
-        // Get the chronological timeline of meals
-        const timeline = await MealEntry.find({ userId, date }).sort({ timestamp: -1 });
+        console.log(`${logPrefix} AI Analysis Successful. Preparing to save to database...`);
 
-        res.status(200).json({ 
-            success: true, 
-            summary: dailySummary,
-            meals: timeline 
+        // 7. Save to Database (Only after AI Success)
+        const imageUrls = req.files.map(file => `/public/uploads/nutrition/${file.filename}`);
+        
+        // Map the parsed JSON from AI into our foodItems subdocument array
+        const extractedFoodItems = aiResult.data.foodItems || []; 
+
+        const newMeal = await Meal.create({
+            userId,
+            date: new Date(),
+            mealType: 'UNKNOWN', // Can be dynamically mapped if AI provides it, or left default
+            isFullyEaten: true,
+            foodItems: extractedFoodItems,
+            imageUrls: imageUrls
         });
-    } catch (error) {
-        res.status(500).json({ success: false, message: "Failed to fetch dashboard." });
-    }
-};
 
-// 5. Get Nutrition Graph Data (Time-series)
-exports.getNutritionGraph = async (req, res) => {
-    try {
-        const userId = req.user.id;
-        const { range } = req.query; // e.g., ?range=week, ?range=month
+        console.log(`${logPrefix} Meal successfully saved to DB. Meal ID: ${newMeal._id}`);
+        console.log(`${logPrefix} ================= REQUEST COMPLETE =================\n`);
+
+        // 8. Return response
+        return res.status(200).json({
+            success: true,
+            mealId: newMeal._id,
+            imageUrls: imageUrls,
+            data: aiResult.data
+        });
+
+    } catch (error) {
+        console.error(`${logPrefix} Fatal Server Error:`, error);
         
-        let limit = 7;
-        if (range === 'month') limit = 30;
-        if (range === 'year') limit = 365;
-
-        // Fetch logs sorted by date descending, then limit to the requested range
-        const logs = await NutritionLog.find({ userId })
-            .sort({ date: -1 })
-            .limit(limit)
-            .select('date dailyHealthScore totalCalories totalProtein totalWater');
-
-        // Reverse to chronological order for graphing
-        res.status(200).json({ success: true, data: logs.reverse() });
-    } catch (error) {
-        res.status(500).json({ success: false, message: "Failed to fetch graph data." });
-    }
-};
-
-// 6. Sync Data (Bi-directional)
-exports.syncNutritionData = async (req, res) => {
-    try {
-        const { localEntries } = req.body; 
-        const userId = req.user.id;
-
-        // If the Android app has offline entries, insert them first
-        if (localEntries && localEntries.length > 0) {
-            // Note: In production, handle deduplication here
-            await MealEntry.insertMany(localEntries.map(e => ({ ...e, userId })));
-            
-            // Re-calculate the daily logs for any affected dates
-            const uniqueDates = [...new Set(localEntries.map(e => e.date))];
-            for (const date of uniqueDates) {
-                await updateDailyLog(userId, date);
-            }
+        // Attempt cleanup if files exist
+        if (req.files) {
+            req.files.forEach(file => {
+                if (fs.existsSync(file.path)) fs.unlinkSync(file.path);
+            });
         }
 
-        // Send back the absolute source of truth from the server for today
-        const date = getTodayDateString();
-        const serverSummary = await NutritionLog.findOne({ userId, date });
-        
-        res.status(200).json({ success: true, message: "Sync complete.", serverSummary });
-    } catch (error) {
-        res.status(500).json({ success: false, message: "Sync failed." });
+        return res.status(500).json({ 
+            success: false, 
+            message: "An unexpected error occurred during meal analysis.",
+            error: error.message 
+        });
     }
 };
