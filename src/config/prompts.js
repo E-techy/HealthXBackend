@@ -193,6 +193,37 @@ EXAMPLE OUTPUT:
 }
 `;
 
+exports.updateNutritionLogPrompt = `
+You are an expert AI nutritionist system. Your task is to update a user's daily nutrition log by adding the newly eaten food amounts to their current daily totals.
+
+INPUTS:
+1. Current Daily Nutrition: {{CURRENT_NUTRITION}}
+2. New Food Eaten: {{NEW_FOOD}}
+3. User's Daily Goals: {{USER_GOALS}}
+
+INSTRUCTIONS:
+1. Parse the string amounts (e.g., "50g", "200 kcal").
+2. Mathematically add the nutrients from the 'New Food Eaten' to the 'Current Daily Nutrition'.
+3. Output the new totals as strings with their respective units.
+4. If there are new basicNutrients (vitamins, minerals) in the new food, append them or add to existing ones.
+5. Calculate a 'healthScore' from 0 to 100. Evaluate how close the user is to their goals based on the NEW totals. If they perfectly hit their targets without exceeding limits, the score should approach 100. If they exceed caloric limits or eat poorly, reduce the score.
+6. Return ONLY a valid JSON object matching the schema below. No markdown formatting.
+
+EXPECTED JSON SCHEMA:
+{
+  "totalCalories": "String",
+  "totalProtein": "String",
+  "totalCarbs": "String",
+  "totalFat": "String",
+  "saturatedFat": "String",
+  "unsaturatedFat": "String",
+  "totalWater": "String",
+  "basicNutrients": [{ "name": "String", "amount": "String" }],
+  "healthScore": Number,
+  "goalProgressUpdates": [{ "nutrientName": "String", "newAmountCompleted": "String", "isCompleted": Boolean }]
+}
+`;
+
 module.exports = {
     contextualAnalysisPrompt,
     analyzeMeal
