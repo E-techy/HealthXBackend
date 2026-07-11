@@ -45,8 +45,8 @@ const foodItemSchema = new mongoose.Schema({
     // Packaged / Commercial Food Data (e.g., the Coke bottle)
     brandName: { type: String },
     manufacturerInfo: { type: String },
-    manufactureDate: { type: Date },
-    expiryDate: { type: Date },
+    manufactureDate: { type: String },
+    expiryDate: { type: String },
     countryOfOrigin: { type: String },
     
     // Personalized AI Scoring per item
