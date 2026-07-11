@@ -3,6 +3,7 @@ const router = express.Router();
 const multer = require('multer');
 const path = require('path');
 const nutritionController = require('../controllers/nutritionController');
+const logController = require('../controllers/nutritionLogController');
 const { requireJWT } = require('../middlewares/authMiddleware');
 
 // ==========================================
@@ -46,5 +47,13 @@ router.use(requireJWT);
 
 // ONLY active route for now as requested
 router.post('/ai/analyze', safeUploadArray, nutritionController.analyzeFoodImages);
+
+// New Log and Meal Routes
+router.post('/log/save', logController.saveMealToLog);
+router.get('/meals', logController.getMeals);
+
+// New Goals Routes
+router.post('/goals', logController.createGoal);
+router.get('/goals', logController.getGoals);
 
 module.exports = router;
