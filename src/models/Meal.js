@@ -81,7 +81,9 @@ const mealSchema = new mongoose.Schema({
     },
     
     // Media (All images uploaded for this specific eating event)
-    imageUrls: [{ type: String }] 
+    imageUrls: [{ type: String }] ,
+    // Added discard flag
+    discarded: { type: Boolean, default: false }
 
 }, { timestamps: true });
 
