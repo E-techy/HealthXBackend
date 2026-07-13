@@ -18,4 +18,13 @@ router.patch('/hash/:hashId/status', accessController.updateHashStatus);
 // Completely delete a hash
 router.delete('/hash/:hashId', accessController.deleteHash);
 
+// ... existing access routes ...
+const blocklistController = require('../controllers/blocklistController');
+
+// Get all blocked users (returns userId, name, profileImageUri)
+router.get('/blocklist', blocklistController.getBlocklistedUsers);
+
+// Remove a user from the blocklist
+router.delete('/blocklist/:blockedUserId', blocklistController.removeBlockedUser);
+
 module.exports = router;
