@@ -275,3 +275,208 @@ POST /api/access/friends/:friendId/block
 **Description**
 
 Deletes the Friendship document **AND** inserts User B's ID into the Blocklist.
+
+---
+
+# 3. Standardized API Responses (Outputs & Errors)
+
+The HealthX backend uses a consistent JSON structure for every route.
+
+The frontend should always check the `success` boolean first.
+
+---
+
+## A. The Standard Error Model (Frontend Catch-All)
+
+Whenever an API call fails (**4xx** or **5xx** status codes), the backend will return this exact format.
+
+The frontend should read the `message` to display a toast or alert to the user.
+
+### Error Response
+
+```json
+{
+  "success": false,
+  "message": "Human-readable error description here."
+}
+```
+
+---
+
+## B. Specific Error Scenarios to Handle
+
+The frontend must be prepared to handle these specific HTTP status codes and messages.
+
+### 400 Bad Request (Validation Errors)
+
+**Scenario**
+
+User B tries to scan a hash but sends invalid data.
+
+**Response**
+
+```json
+{
+  "success": false,
+  "message": "Please provide an array of actions."
+}
+```
+
+---
+
+### 401 Unauthorized (Auth / Token Errors)
+
+**Scenario**
+
+The JWT token expired or wasn't sent.
+
+The app should force a logout/re-login.
+
+**Response**
+
+```json
+{
+  "success": false,
+  "message": "Session expired. Please log in again."
+}
+```
+
+---
+
+### 403 Forbidden (Account Issues)
+
+**Scenario**
+
+User tries to do something but their account is suspended.
+
+**Response**
+
+```json
+{
+  "success": false,
+  "message": "Access denied. Account is suspended."
+}
+```
+
+---
+
+### 404 Not Found (Missing Data)
+
+**Scenario**
+
+User A tries to delete a hash that doesn't exist or they don't own.
+
+**Response**
+
+```json
+{
+  "success": false,
+  "message": "Hash not found or you do not have permission to modify it."
+}
+```
+
+---
+
+### 500 Internal Server Error (Backend Crash)
+
+**Scenario**
+
+Database goes down.
+
+**Response**
+
+```json
+{
+  "success": false,
+  "message": "Server error generating hash."
+}
+```
+
+---
+
+# 4. Standardized Success Models (Data Payloads)
+
+When `success: true`, the requested data is always nested inside the `data` key.
+
+---
+
+## A. ShareableHash Payload (QR Code Data)
+
+Returned when fetching active public links (`GET /api/access/hash`) or generating a new one.
+
+```json
+{
+  "success": true,
+  "message": "QR Hash generated successfully.",
+  "data": {
+    "_id": "64b1c2d3e4f5a6b7c8d9e0f1",
+    "hashId": "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0u1v2w3x4y5z6a7b8c9d0e1f2",
+    "userId": "64b1c2d3e4f5a6b7c8d9e0f2",
+    "actions": [
+      "ALL",
+      "SET_GOALS"
+    ],
+    "status": "ACTIVE",
+    "createdAt": "2026-07-14T03:42:20.000Z",
+    "updatedAt": "2026-07-14T03:42:20.000Z",
+    "__v": 0
+  }
+}
+```
+
+---
+
+## B. Friendship Payload (Active Connection)
+
+Returned when User B successfully scans User A's hash (`POST /api/access/connect/:hashId`).
+
+```json
+{
+  "success": true,
+  "message": "Friend added successfully.",
+  "data": {
+    "_id": "64b1c2d3e4f5a6b7c8d9e0f3",
+    "ownerId": "64b1c2d3e4f5a6b7c8d9e0f2",
+    "viewerId": "64b1c2d3e4f5a6b7c8d9e0f4",
+    "permissions": [
+      {
+        "action": "SEE_NUTRITION",
+        "isActive": true
+      },
+      {
+        "action": "SET_GOALS",
+        "isActive": false
+      }
+    ],
+    "createdAt": "2026-07-14T03:42:20.000Z",
+    "updatedAt": "2026-07-14T03:42:20.000Z",
+    "__v": 0
+  }
+}
+```
+
+---
+
+## C. Blocklist UI Payload
+
+Returned when fetching the blocklist (`GET /api/access/blocklist`).
+
+Notice this is **not** the raw database model, but the joined profile data specifically formatted for the Android UI to easily render a list of blocked users.
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "userId": "64b1c2d3e4f5a6b7c8d9e0f6",
+      "name": "Rajat",
+      "profileImageUri": "/public/uploads/profile_12345.jpg"
+    },
+    {
+      "userId": "64b1c2d3e4f5a6b7c8d9e0f9",
+      "name": "Zahid",
+      "profileImageUri": "/public/uploads/profile_98765.jpg"
+    }
+  ]
+}
+```
