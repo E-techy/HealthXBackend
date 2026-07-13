@@ -5,6 +5,7 @@ const subscriptionRoutes = require('./routes/subscriptionRoutes');
 const deviceRoutes = require('./routes/deviceRoutes');
 const nutritionRoutes = require('./routes/nutritionRoutes');
 const settingRoutes = require('./routes/settingRoutes');
+const accessRoutes = require('./routes/accessRoutes');
 
 const app = express();
 
@@ -29,6 +30,8 @@ const notificationRoutes = require('./routes/notificationRoutes');
 app.use('/api/notifications', notificationRoutes);
 
 app.use('/api/settings', settingRoutes);
+
+app.use('/api/access', accessRoutes);
 
 app.use((err, req, res, next) => {
     console.error(err.stack);
