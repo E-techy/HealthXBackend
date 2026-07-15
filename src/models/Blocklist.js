@@ -5,12 +5,22 @@ const blocklistSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId, 
         ref: 'UserAuth', 
         required: true, 
-        index: true 
+        index: true // The person who clicked "Block"
     },
     blockedUserId: { 
         type: mongoose.Schema.Types.ObjectId, 
         ref: 'UserAuth', 
-        required: true 
+        required: true // The person being blocked
+    },
+    reason: {
+        type: String,
+        enum: ['SPAM', 'INAPPROPRIATE_BEHAVIOR', 'NO_LONGER_FRIENDS', 'PRIVACY_CONCERN', 'OTHER'],
+        required: true,
+        default: 'OTHER'
+    },
+    notes: {
+        type: String, // Optional detailed explanation from the user
+        maxLength: 500
     }
 }, { timestamps: true });
 
