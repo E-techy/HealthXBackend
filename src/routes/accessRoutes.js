@@ -5,29 +5,34 @@ const blocklistController = require('../controllers/blocklistController');
 const friendshipController = require('../controllers/friendshipController');
 const { requireJWT } = require('../middlewares/authMiddleware');
 
-// Protect all access/hash routes
+// Protect all access routes
 router.use(requireJWT);
 
-// Create a new public hash
+// --- HASH ROUTES (Phase 1) ---
 router.post('/hash', accessController.createHash);
-
-// Get all generated hashes for the user
 router.get('/hash', accessController.getAllHashes);
-
-// Update status of a specific hash (Active/Unactive)
 router.patch('/hash/:hashId/status', accessController.updateHashStatus);
-
-// Completely delete a hash
 router.delete('/hash/:hashId', accessController.deleteHash);
 
-
-// Get all blocked users (returns userId, name, profileImageUri)
-router.get('/blocklist', blocklistController.getBlocklistedUsers);
-
-// Remove a user from the blocklist
-router.delete('/blocklist/:blockedUserId', blocklistController.removeBlockedUser);
-
-// Connect via scanned hash
+// --- CONNECTION ROUTE (Phase 2) --- 
 router.post('/connect/:hashId', friendshipController.connectWithHash);
+
+// --- DASHBOARD / MANAGEMENT ROUTES (Phase 3) ---
+
+// User A viewing people they gave access to
+router.get('/friends/granted', friendshipController.getGrantedAccess);
+
+// User B viewing people whose data they can see
+router.get('/friends/received', friendshipController.getReceivedAccess);
+
+// User A updating User B's granular permissions
+router.patch('/friends/:targetUserId/permissions', friendshipController.updateFriendPermissions);
+
+// Block & Report a user (Works for both A blocking B, or B blocking A)
+router.post('/friends/:targetUserId/block', friendshipController.blockAndReportUser);
+
+// --- BLOCKLIST ROUTES ---
+router.get('/blocklist', blocklistController.getBlocklistedUsers);
+router.delete('/blocklist/:blockedUserId', blocklistController.removeBlockedUser);
 
 module.exports = router;
