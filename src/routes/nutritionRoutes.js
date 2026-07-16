@@ -6,6 +6,9 @@ const nutritionController = require('../controllers/nutritionController');
 const logController = require('../controllers/nutritionLogController');
 const { requireJWT } = require('../middlewares/authMiddleware');
 
+// 1. IMPORT THE DELEGATED ACCESS MIDDLEWARE
+const { requireDelegatedAccess } = require('../middlewares/delegatedAccessMiddleware'); 
+
 // ==========================================
 // MULTER CONFIGURATION
 // ==========================================
@@ -38,22 +41,49 @@ const safeUploadArray = (req, res, next) => {
     });
 };
 
-// Apply JWT middleware to all routes in this file
+// ==========================================
+// MIDDLEWARE PIPELINE
+// ==========================================
+
+// 2. Ensure every request is authenticated first
 router.use(requireJWT);
 
 // ==========================================
-// ROUTES
+// SECURE DELEGATED ROUTES
 // ==========================================
 
-// ONLY active route for now as requested
-router.post('/ai/analyze', safeUploadArray, nutritionController.analyzeFoodImages);
+// Nutrition Analysis (Requires Write/Edit access)
+router.post(
+    '/ai/analyze', 
+    safeUploadArray, 
+    requireDelegatedAccess('EDIT_NUTRITION'), 
+    nutritionController.analyzeFoodImages
+);
 
-// New Log and Meal Routes
-router.post('/log/save', logController.saveMealToLog);
-router.get('/meals', logController.getMeals);
+// Log and Meal Routes (Split between Read and Write)
+router.post(
+    '/log/save', 
+    requireDelegatedAccess('EDIT_NUTRITION'), 
+    logController.saveMealToLog
+);
 
-// New Goals Routes
-router.post('/goals', logController.createGoal);
-router.get('/goals', logController.getGoals);
+router.get(
+    '/meals', 
+    requireDelegatedAccess('SEE_NUTRITION'), 
+    logController.getMeals
+);
+
+// Goals Routes (Split between Read and Write)
+router.post(
+    '/goals', 
+    requireDelegatedAccess('EDIT_GOALS'), 
+    logController.createGoal
+);
+
+router.get(
+    '/goals', 
+    requireDelegatedAccess('SEE_GOALS'), 
+    logController.getGoals
+);
 
 module.exports = router;
