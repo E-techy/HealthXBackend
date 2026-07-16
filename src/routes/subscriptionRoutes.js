@@ -3,6 +3,9 @@ const router = express.Router();
 const subscriptionController = require('../controllers/subscriptionController');
 const { requireJWT } = require('../middlewares/authMiddleware');
 
+// 1. IMPORT DELEGATED ACCESS MIDDLEWARE
+const { requireDelegatedAccess } = require('../middlewares/delegatedAccessMiddleware');
+
 // =======================
 // PUBLIC ROUTES
 // =======================
@@ -15,12 +18,20 @@ router.get('/plans/:id', subscriptionController.getPlanById);
 // PROTECTED ROUTES 
 // =======================
 // Apply the JWT middleware to all routes below this line
-// If no JWT is present, requireJWT will automatically send a 401 code with "Please log in again."
 router.use(requireJWT); 
 
+// 🚨 CRITICAL SECURITY GUARDRAIL 🚨
+// Do NOT add delegated access to financial routes. 
+// Only the true account owner (identified by requireJWT) can make payments.
 router.post('/order/create', subscriptionController.createOrder);
 router.post('/order/cancel', subscriptionController.cancelOrder);
 router.post('/order/verify', subscriptionController.verifyPayment);
-router.get('/status', subscriptionController.getSubscriptionStatus);
+
+// It IS safe to let a delegated user check the subscription status
+router.get(
+    '/status', 
+    requireDelegatedAccess('SEE_SUBSCRIPTION'), 
+    subscriptionController.getSubscriptionStatus
+);
 
 module.exports = router;
