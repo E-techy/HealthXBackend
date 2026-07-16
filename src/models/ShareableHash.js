@@ -1,4 +1,8 @@
 const mongoose = require('mongoose');
+const DELEGATED_PERMISSIONS = require('../config/permissions'); // Adjust the path if needed
+
+// Dynamically extract the valid action keys (e.g., ['SEE_NUTRITION', 'EDIT_NUTRITION', ...])
+const validActions = Object.keys(DELEGATED_PERMISSIONS);
 
 const shareableHashSchema = new mongoose.Schema({
     hashId: { 
@@ -15,8 +19,12 @@ const shareableHashSchema = new mongoose.Schema({
     },
     actions: [{ 
         type: String, 
-        required: true 
-    }], // e.g., ["ALL"] or ["SET_GOALS", "SEE_NUTRITION"]
+        required: true,
+        enum: {
+            values: validActions,
+            message: '"{VALUE}" is not a valid permission action.'
+        }
+    }],
     status: { 
         type: String, 
         enum: ['ACTIVE', 'UNACTIVE', 'DELETED'], 

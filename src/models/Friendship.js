@@ -1,23 +1,36 @@
 const mongoose = require('mongoose');
+const DELEGATED_PERMISSIONS = require('../config/permissions');
+
+const validActions = Object.keys(DELEGATED_PERMISSIONS);
 
 // Sub-schema for granular toggle control
 const permissionSchema = new mongoose.Schema({
-    action: { type: String, required: true },
-    isActive: { type: Boolean, default: true }
-}, { _id: false }); // Disables auto-generating ObjectIds for each array item to keep docs lightweight
+    action: { 
+        type: String, 
+        required: true,
+        enum: {
+            values: validActions,
+            message: '"{VALUE}" is not a valid permission action.'
+        }
+    },
+    isActive: { 
+        type: Boolean, 
+        default: true 
+    }
+}, { _id: false });
 
 const friendshipSchema = new mongoose.Schema({
     ownerId: { 
         type: mongoose.Schema.Types.ObjectId, 
         ref: 'UserAuth', 
         required: true, 
-        index: true // User A (The one who showed the QR)
+        index: true 
     },
     viewerId: { 
         type: mongoose.Schema.Types.ObjectId, 
         ref: 'UserAuth', 
         required: true, 
-        index: true // User B (The one who scanned)
+        index: true 
     },
     permissions: [permissionSchema]
 }, { timestamps: true });
