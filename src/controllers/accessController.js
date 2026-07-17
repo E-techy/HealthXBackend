@@ -121,3 +121,41 @@ exports.deleteHash = async (req, res) => {
         res.status(500).json({ success: false, message: "Server error deleting hash." });
     }
 };
+
+// 5. Update Hash Permissions (Actions)
+exports.updateHashActions = async (req, res) => {
+    try {
+        const { hashId } = req.params;
+        const { actions } = req.body;
+
+        if (!actions || !Array.isArray(actions) || actions.length === 0) {
+            return res.status(400).json({ 
+                success: false, 
+                message: "Please provide an array of actions." 
+            });
+        }
+
+        const updatedHash = await ShareableHash.findOneAndUpdate(
+            { hashId, userId: req.user.id },
+            { actions },
+            { new: true } // Returns the updated document
+        );
+
+        if (!updatedHash) {
+            return res.status(404).json({ 
+                success: false, 
+                message: "Hash not found or you do not have permission to modify it." 
+            });
+        }
+
+        res.status(200).json({
+            success: true,
+            message: "Link permissions updated successfully.",
+            data: updatedHash
+        });
+
+    } catch (error) {
+        console.error("🔥 Error updating hash actions:", error);
+        res.status(500).json({ success: false, message: "Server error updating permissions." });
+    }
+};
