@@ -12,6 +12,7 @@ router.use(requireJWT);
 router.post('/hash', accessController.createHash);
 router.get('/hash', accessController.getAllHashes);
 router.patch('/hash/:hashId/status', accessController.updateHashStatus);
+router.patch('/hash/:hashId/actions', accessController.updateHashActions); 
 router.delete('/hash/:hashId', accessController.deleteHash);
 
 // --- CONNECTION ROUTE (Phase 2) --- 
