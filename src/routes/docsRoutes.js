@@ -8,6 +8,12 @@ const uploadDocs = require('../middlewares/uploadDocsMiddleware');
 // 'documentFile' is the key the Android app will use in its Multipart/Form-Data request
 router.post('/upload', requireJWT, uploadDocs.single('documentFile'), docsController.uploadDocument);
 
+// Get logged-in user's documents
+router.get('/my-docs', requireJWT, docsController.getMyDocuments);
+
+// Get documents shared explicitly with the logged-in user
+router.get('/shared-with-me', requireJWT, docsController.getSharedWithMe);
+
 // === 2. OWNER MANAGEMENT (Requires Auth) ===
 router.post('/:documentId}/make-public', requireJWT, docsController.makePublic);
 router.post('/:documentId}/set-password', requireJWT, docsController.setPassword);
