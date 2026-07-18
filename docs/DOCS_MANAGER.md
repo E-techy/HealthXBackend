@@ -573,4 +573,66 @@ Raw binary file stream.
   "success": false,
   "message": "Error verifying document permissions."
 }
+```    
+
+---
+
+# 3.8 Get My Documents & Shared Documents
+
+Fetches a paginated list of documents either owned by the user or shared with the user.
+
+## Endpoints
+
+```http
+GET /api/docs/my-docs
 ```
+
+```http
+GET /api/docs/shared-with-me
+```
+
+## Query Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `page` | Integer | `1` | The page number to fetch. |
+| `limit` | Integer | `10` | Number of documents per page (Max `50`). |
+| `sort` | String | `desc` | `desc` (newest first) or `asc` (oldest first). |
+| `category` | String | `null` | Filter by category (e.g. `HEALTH`, `DIAGNOSTICS`). |
+
+## Example Android Retrofit Request URL
+
+```http
+GET /api/docs/my-docs?page=2&limit=15&sort=desc&category=DIAGNOSTICS
+```
+
+## Success Response (200 OK)
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "_id": "64b8d1...",
+      "userId": "64a7c...",
+      "documentName": "Blood_Test.pdf",
+      "documentType": "application/pdf",
+      "documentCategory": "DIAGNOSTICS",
+      "createdAt": "2026-07-19T10:30:00.000Z",
+      "updatedAt": "2026-07-19T10:30:00.000Z"
+    }
+  ],
+  "pagination": {
+    "totalDocuments": 42,
+    "currentPage": 2,
+    "totalPages": 3,
+    "hasNextPage": true
+  }
+}
+```
+
+
+
+
+
+
