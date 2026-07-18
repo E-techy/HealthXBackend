@@ -216,3 +216,105 @@ exports.downloadShared = async (req, res) => {
         res.status(500).json({ success: false, message: "Error verifying document permissions." });
     }
 };
+
+// === ADD THESE TO src/controllers/docsController.js ===
+
+// 8. Get Owned Documents (With Pagination & Filters)
+exports.getMyDocuments = async (req, res) => {
+    try {
+        // 1. Extract query parameters with defaults
+        const page = Math.max(1, parseInt(req.query.page) || 1);
+        const limit = Math.min(50, Math.max(1, parseInt(req.query.limit) || 10)); // Max 50 per request
+        const sortOrder = req.query.sort === 'asc' ? 1 : -1; // Default to -1 (newest first)
+        const category = req.query.category;
+
+        // 2. Build the query
+        const query = { userId: req.user.id };
+        if (category) {
+            query.documentCategory = category;
+        }
+
+        // 3. Execute query in parallel with count to minimize wait time
+        const [docs, total] = await Promise.all([
+            Document.find(query)
+                .sort({ createdAt: sortOrder })
+                .skip((page - 1) * limit)
+                .limit(limit)
+                .select('-serverPath') // Hide the physical path from the client
+                .lean(), // .lean() drastically reduces memory usage for read-only ops
+            
+            Document.countDocuments(query)
+        ]);
+
+        res.status(200).json({
+            success: true,
+            data: docs,
+            pagination: {
+                totalDocuments: total,
+                currentPage: page,
+                totalPages: Math.ceil(total / limit),
+                hasNextPage: (page * limit) < total
+            }
+        });
+    } catch (error) {
+        console.error(`[DocsManager] ❌ GET MY DOCS ERROR:`, error.message);
+        res.status(500).json({ success: false, message: "Failed to retrieve documents." });
+    }
+};
+
+// 9. Get Documents Shared With Me
+exports.getSharedWithMe = async (req, res) => {
+    try {
+        const page = Math.max(1, parseInt(req.query.page) || 1);
+        const limit = Math.min(50, parseInt(req.query.limit) || 10);
+        const sortOrder = req.query.sort === 'asc' ? 1 : -1;
+        const category = req.query.category;
+
+        // Step 1: Find all access records where user is in sharedWithUsers array
+        const accessRecords = await DocumentAccess.find({ sharedWithUsers: req.user.id })
+            .select('documentId')
+            .lean();
+
+        // Extract just the IDs
+        const sharedDocIds = accessRecords.map(record => record.documentId);
+
+        if (sharedDocIds.length === 0) {
+            return res.status(200).json({
+                success: true,
+                data: [],
+                pagination: { totalDocuments: 0, currentPage: 1, totalPages: 0, hasNextPage: false }
+            });
+        }
+
+        // Step 2: Build the query for the Document collection
+        const query = { _id: { $in: sharedDocIds } };
+        if (category) {
+            query.documentCategory = category;
+        }
+
+        const [docs, total] = await Promise.all([
+            Document.find(query)
+                .sort({ createdAt: sortOrder })
+                .skip((page - 1) * limit)
+                .limit(limit)
+                .select('-serverPath') 
+                .lean(),
+            
+            Document.countDocuments(query)
+        ]);
+
+        res.status(200).json({
+            success: true,
+            data: docs,
+            pagination: {
+                totalDocuments: total,
+                currentPage: page,
+                totalPages: Math.ceil(total / limit),
+                hasNextPage: (page * limit) < total
+            }
+        });
+    } catch (error) {
+        console.error(`[DocsManager] ❌ GET SHARED DOCS ERROR:`, error.message);
+        res.status(500).json({ success: false, message: "Failed to retrieve shared documents." });
+    }
+};
