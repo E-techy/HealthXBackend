@@ -318,3 +318,130 @@ exports.getSharedWithMe = async (req, res) => {
         res.status(500).json({ success: false, message: "Failed to retrieve shared documents." });
     }
 };
+
+// === ADD THESE TO src/controllers/docsController.js ===
+
+// 10. View Access Details (Who has access to this doc?)
+exports.getDocumentAccessDetails = async (req, res) => {
+    try {
+        const { documentId } = req.params;
+
+        // Verify ownership first
+        const doc = await Document.findOne({ _id: documentId, userId: req.user.id });
+        if (!doc) return res.status(404).json({ success: false, message: "Document not found or unauthorized." });
+
+        const access = await DocumentAccess.findOne({ documentId })
+            .populate('sharedWithUsers', 'name email profileImageUri'); // Populate basic user info
+
+        res.status(200).json({
+            success: true,
+            data: {
+                isPublic: access.isPublic,
+                publicUrl: access.isPublic ? `/api/docs/public/${access.publicKey}` : null,
+                isPasswordProtected: !!access.passwordHash,
+                sharedUsers: access.sharedWithUsers
+            }
+        });
+    } catch (error) {
+        console.error(`[DocsManager] ❌ GET ACCESS DETAILS ERROR:`, error.message);
+        res.status(500).json({ success: false, message: "Failed to fetch access details." });
+    }
+};
+
+// 11. Revoke Public Access
+exports.revokePublic = async (req, res) => {
+    try {
+        const { documentId } = req.params;
+
+        const doc = await Document.findOne({ _id: documentId, userId: req.user.id });
+        if (!doc) return res.status(404).json({ success: false, message: "Document not found or unauthorized." });
+
+        // Nullify the public key and set isPublic to false
+        await DocumentAccess.findOneAndUpdate(
+            { documentId },
+            { isPublic: false, publicKey: null }
+        );
+
+        res.status(200).json({ success: true, message: "Public access revoked. The link is now dead." });
+    } catch (error) {
+        console.error(`[DocsManager] ❌ REVOKE PUBLIC ERROR:`, error.message);
+        res.status(500).json({ success: false, message: "Failed to revoke public access." });
+    }
+};
+
+// 12. Remove a Shared User
+exports.removeSharedUser = async (req, res) => {
+    try {
+        const { documentId } = req.params;
+        const { targetUserId } = req.body;
+
+        if (!targetUserId) return res.status(400).json({ success: false, message: "Target User ID is required." });
+
+        const doc = await Document.findOne({ _id: documentId, userId: req.user.id });
+        if (!doc) return res.status(404).json({ success: false, message: "Document not found or unauthorized." });
+
+        // $pull removes the specific ID from the array
+        await DocumentAccess.findOneAndUpdate(
+            { documentId },
+            { $pull: { sharedWithUsers: targetUserId } }
+        );
+
+        res.status(200).json({ success: true, message: "User access revoked." });
+    } catch (error) {
+        console.error(`[DocsManager] ❌ REVOKE SHARE ERROR:`, error.message);
+        res.status(500).json({ success: false, message: "Failed to remove user access." });
+    }
+};
+
+// 13. Update Document Details (Name / Category)
+exports.updateDocument = async (req, res) => {
+    try {
+        const { documentId } = req.params;
+        const { documentName, documentCategory } = req.body;
+
+        const updateData = {};
+        if (documentName) updateData.documentName = documentName;
+        if (documentCategory) updateData.documentCategory = documentCategory;
+
+        const doc = await Document.findOneAndUpdate(
+            { _id: documentId, userId: req.user.id },
+            { $set: updateData },
+            { new: true }
+        );
+
+        if (!doc) return res.status(404).json({ success: false, message: "Document not found or unauthorized." });
+
+        res.status(200).json({ success: true, message: "Document updated.", document: doc });
+    } catch (error) {
+        console.error(`[DocsManager] ❌ UPDATE DOC ERROR:`, error.message);
+        res.status(500).json({ success: false, message: "Failed to update document." });
+    }
+};
+
+// 14. Completely Delete Document (Database + Filesystem)
+exports.deleteDocument = async (req, res) => {
+    try {
+        const { documentId } = req.params;
+
+        // 1. Find the document to get the file path
+        const doc = await Document.findOne({ _id: documentId, userId: req.user.id });
+        if (!doc) return res.status(404).json({ success: false, message: "Document not found or unauthorized." });
+
+        // 2. Delete physical file from the server
+        if (doc.serverPath && fs.existsSync(doc.serverPath)) {
+            fs.unlinkSync(doc.serverPath);
+            console.log(`[DocsManager] 🗑️ Physical file deleted: ${doc.serverPath}`);
+        } else {
+            console.warn(`[DocsManager] ⚠️ Physical file was already missing: ${doc.serverPath}`);
+        }
+
+        // 3. Delete Database Records
+        await DocumentAccess.findOneAndDelete({ documentId });
+        await Document.findOneAndDelete({ _id: documentId });
+
+        res.status(200).json({ success: true, message: "Document permanently deleted." });
+    } catch (error) {
+        console.error(`[DocsManager] ❌ DELETE DOC ERROR:`, error.message);
+        res.status(500).json({ success: false, message: "Failed to delete document." });
+    }
+};
