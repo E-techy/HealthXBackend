@@ -18,6 +18,16 @@ router.get('/shared-with-me', requireJWT, docsController.getSharedWithMe);
 router.post('/:documentId}/make-public', requireJWT, docsController.makePublic);
 router.post('/:documentId}/set-password', requireJWT, docsController.setPassword);
 router.post('/:documentId}/share', requireJWT, docsController.shareWithUser);
+// Get access status (Who can see this?)
+router.get('/:documentId/access-details', requireJWT, docsController.getDocumentAccessDetails);
+
+// Revoke access routes
+router.post('/:documentId/revoke-public', requireJWT, docsController.revokePublic);
+router.post('/:documentId/revoke-share', requireJWT, docsController.removeSharedUser);
+
+// Update & Delete routes
+router.put('/:documentId', requireJWT, docsController.updateDocument);
+router.delete('/:documentId', requireJWT, docsController.deleteDocument);
 
 // === 3. FILE DOWNLOAD/ACCESS ROUTES ===
 // Public URL (No Auth needed)
