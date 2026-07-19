@@ -630,7 +630,147 @@ GET /api/docs/my-docs?page=2&limit=15&sort=desc&category=DIAGNOSTICS
   }
 }
 ```
+---
 
+# 3.9 Get Document Access Details
+
+Shows the owner exactly who has access to the document.
+
+## Endpoint
+
+```http
+GET /api/docs/:documentId/access-details
+```
+
+## Success Response (200 OK)
+
+```json
+{
+  "success": true,
+  "data": {
+    "isPublic": true,
+    "publicUrl": "/api/docs/public/a1b2c...",
+    "isPasswordProtected": false,
+    "sharedUsers": [
+      {
+        "_id": "64a7c...",
+        "name": "Zahid",
+        "email": "zahid@example.com",
+        "profileImageUri": "/public/uploads/avatar.jpg"
+      }
+    ]
+  }
+}
+```
+
+---
+
+# 3.10 Revoke Public Access
+
+Kills the public URL immediately. Anyone hitting the old link will get a `404`.
+
+## Endpoint
+
+```http
+POST /api/docs/:documentId/revoke-public
+```
+
+**Body**
+
+None.
+
+---
+
+# 3.11 Revoke Shared User Access
+
+Removes a specific user from the access list.
+
+## Endpoint
+
+```http
+POST /api/docs/:documentId/revoke-share
+```
+
+## Body (JSON)
+
+```json
+{
+  "targetUserId": "64a7c..."
+}
+```
+
+---
+
+# 3.12 Update Document Metadata
+
+Updates the document's metadata.
+
+## Endpoint
+
+```http
+PUT /api/docs/:documentId
+```
+
+## Body (JSON)
+
+```json
+{
+  "documentName": "Updated Blood Work.pdf",
+  "documentCategory": "HEALTH"
+}
+```
+
+---
+
+# 3.13 Delete Document
+
+Permanently destroys the database records and deletes the file from the `protected_docs` folder to free up disk space.
+
+## Endpoint
+
+```http
+DELETE /api/docs/:documentId
+```
+
+**Body**
+
+None.
+
+---
+
+# Update to **GET /api/docs/my-docs** Response
+
+No changes are required to the Android client request.
+
+Since `getMyDocuments` already fetches documents directly from the `Document` collection using `.lean()`, the endpoint will automatically include the newly added access-related fields.
+
+## Updated Success Response (200 OK)
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "_id": "64b8d1...",
+      "documentName": "X-Ray_Results.jpg",
+      "documentType": "image/jpeg",
+      "documentCategory": "DIAGNOSTICS",
+      "isPublic": true,
+      "isPasswordProtected": true,
+      "sharedCount": 2,
+      "createdAt": "2026-07-19T10:30:00.000Z"
+    }
+  ]
+}
+```
+
+### New Response Fields
+
+| Field | Type | Description |
+|--------|------|-------------|
+| `isPublic` | Boolean | Instantly know whether to display the public access icon. |
+| `isPasswordProtected` | Boolean | Instantly know whether to display the password/lock icon. |
+| `sharedCount` | Integer | Number of users the document has been shared with (e.g. "Shared with 2 people"). |
 
 
 
