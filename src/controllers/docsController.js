@@ -74,24 +74,22 @@ exports.makePublic = async (req, res) => {
         const { documentId } = req.params;
         const doc = await Document.findOne({ _id: documentId, userId: req.user.id });
         
-        if (!doc) {
-            console.warn(`[DocsManager] ⚠️ Unauthorized public link attempt for DocID: ${documentId} by UserID: ${req.user.id}`);
-            return res.status(404).json({ success: false, message: "Document not found or unauthorized." });
-        }
+        if (!doc) return res.status(404).json({ success: false, message: "Document not found or unauthorized." });
 
         const publicKey = crypto.randomBytes(16).toString('hex');
+        
+        // 1. Update Access Table
         await DocumentAccess.findOneAndUpdate(
             { documentId },
-            { isPublic: true, publicKey: publicKey },
-            { new: true }
+            { isPublic: true, publicKey: publicKey }
         );
 
+        // 2. Sync Document Table for UI
+        await Document.findByIdAndUpdate(documentId, { isPublic: true });
+
         const publicUrl = `/api/docs/public/${publicKey}`;
-        console.log(`[DocsManager] 🔗 Public link generated for DocID: ${documentId}`);
-        
         res.status(200).json({ success: true, message: "Document is now public.", publicUrl, publicKey });
     } catch (error) {
-        console.error(`[DocsManager] ❌ MAKE PUBLIC ERROR:`, error.message, error.stack);
         res.status(500).json({ success: false, message: "Failed to generate public link." });
     }
 };
@@ -110,12 +108,14 @@ exports.setPassword = async (req, res) => {
         const salt = await bcrypt.genSalt(10);
         const passwordHash = await bcrypt.hash(password, salt);
 
+        // 1. Update Access Table
         await DocumentAccess.findOneAndUpdate({ documentId }, { passwordHash });
-        console.log(`[DocsManager] 🔒 Password set for DocID: ${documentId}`);
+
+        // 2. Sync Document Table for UI
+        await Document.findByIdAndUpdate(documentId, { isPasswordProtected: true });
 
         res.status(200).json({ success: true, message: "Password protection enabled." });
     } catch (error) {
-        console.error(`[DocsManager] ❌ SET PASSWORD ERROR:`, error.message, error.stack);
         res.status(500).json({ success: false, message: "Failed to set document password." });
     }
 };
@@ -131,15 +131,20 @@ exports.shareWithUser = async (req, res) => {
         const doc = await Document.findOne({ _id: documentId, userId: req.user.id });
         if (!doc) return res.status(404).json({ success: false, message: "Document not found or unauthorized." });
 
-        await DocumentAccess.findOneAndUpdate(
+        // 1. Update Access Table AND return the updated document to count the array
+        const updatedAccess = await DocumentAccess.findOneAndUpdate(
             { documentId },
-            { $addToSet: { sharedWithUsers: targetUserId } }
+            { $addToSet: { sharedWithUsers: targetUserId } },
+            { new: true } // Returns the document AFTER the update
         );
-        console.log(`[DocsManager] 🤝 DocID: ${documentId} shared with UserID: ${targetUserId}`);
+
+        // 2. Sync Document Table counter for UI
+        await Document.findByIdAndUpdate(documentId, { 
+            sharedCount: updatedAccess.sharedWithUsers.length 
+        });
 
         res.status(200).json({ success: true, message: "Document shared successfully." });
     } catch (error) {
-        console.error(`[DocsManager] ❌ SHARE USER ERROR:`, error.message, error.stack);
         res.status(500).json({ success: false, message: "Failed to share document." });
     }
 };
@@ -352,19 +357,21 @@ exports.getDocumentAccessDetails = async (req, res) => {
 exports.revokePublic = async (req, res) => {
     try {
         const { documentId } = req.params;
-
         const doc = await Document.findOne({ _id: documentId, userId: req.user.id });
+        
         if (!doc) return res.status(404).json({ success: false, message: "Document not found or unauthorized." });
 
-        // Nullify the public key and set isPublic to false
+        // 1. Clear Access Table
         await DocumentAccess.findOneAndUpdate(
             { documentId },
             { isPublic: false, publicKey: null }
         );
 
+        // 2. Sync Document Table for UI
+        await Document.findByIdAndUpdate(documentId, { isPublic: false });
+
         res.status(200).json({ success: true, message: "Public access revoked. The link is now dead." });
     } catch (error) {
-        console.error(`[DocsManager] ❌ REVOKE PUBLIC ERROR:`, error.message);
         res.status(500).json({ success: false, message: "Failed to revoke public access." });
     }
 };
@@ -380,15 +387,20 @@ exports.removeSharedUser = async (req, res) => {
         const doc = await Document.findOne({ _id: documentId, userId: req.user.id });
         if (!doc) return res.status(404).json({ success: false, message: "Document not found or unauthorized." });
 
-        // $pull removes the specific ID from the array
-        await DocumentAccess.findOneAndUpdate(
+        // 1. Remove from Access Table AND return updated document
+        const updatedAccess = await DocumentAccess.findOneAndUpdate(
             { documentId },
-            { $pull: { sharedWithUsers: targetUserId } }
+            { $pull: { sharedWithUsers: targetUserId } },
+            { new: true } 
         );
+
+        // 2. Sync Document Table counter for UI
+        await Document.findByIdAndUpdate(documentId, { 
+            sharedCount: updatedAccess.sharedWithUsers.length 
+        });
 
         res.status(200).json({ success: true, message: "User access revoked." });
     } catch (error) {
-        console.error(`[DocsManager] ❌ REVOKE SHARE ERROR:`, error.message);
         res.status(500).json({ success: false, message: "Failed to remove user access." });
     }
 };
