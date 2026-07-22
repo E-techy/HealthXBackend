@@ -6,7 +6,6 @@ const deviceRoutes = require('./routes/deviceRoutes');
 const nutritionRoutes = require('./routes/nutritionRoutes');
 const settingRoutes = require('./routes/settingRoutes');
 const accessRoutes = require('./routes/accessRoutes');
-const accessRoutes = require('./routes/accessRoutes');
 
 // ADD THIS IMPORT
 const docsRoutes = require('./routes/docsRoutes');

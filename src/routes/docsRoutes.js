@@ -15,9 +15,9 @@ router.get('/my-docs', requireJWT, docsController.getMyDocuments);
 router.get('/shared-with-me', requireJWT, docsController.getSharedWithMe);
 
 // === 2. OWNER MANAGEMENT (Requires Auth) ===
-router.post('/:documentId}/make-public', requireJWT, docsController.makePublic);
-router.post('/:documentId}/set-password', requireJWT, docsController.setPassword);
-router.post('/:documentId}/share', requireJWT, docsController.shareWithUser);
+router.post('/:documentId/make-public', requireJWT, docsController.makePublic);
+router.post('/:documentId/set-password', requireJWT, docsController.setPassword);
+router.post('/:documentId/share', requireJWT, docsController.shareWithUser);
 // Get access status (Who can see this?)
 router.get('/:documentId/access-details', requireJWT, docsController.getDocumentAccessDetails);
 
