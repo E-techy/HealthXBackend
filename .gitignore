@@ -145,3 +145,5 @@ vite.config.ts.timestamp-*
 public
 
 healthx-firebase-adminsdk.json
+
+protected_docs
