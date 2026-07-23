@@ -14,6 +14,8 @@ const app = express();
 
 app.use(express.json());
 
+app.use(express.urlencoded({ extended: true }));
+
 // ADD THIS: Make the "public" folder accessible via HTTP
 app.use('/public', express.static(path.join(__dirname, '../public')));
 
