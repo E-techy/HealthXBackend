@@ -33,6 +33,9 @@ router.delete('/:documentId', requireJWT, docsController.deleteDocument);
 // Public URL (No Auth needed)
 router.get('/public/:publicKey', docsController.downloadPublic);
 
+// NEW: Public URL with Password submission (No Auth needed)
+router.post('/public/:publicKey/secure', docsController.downloadPublicSecure);
+
 // Password Protected URL (No Auth needed, requires password in body)
 router.post('/secure/:documentId', docsController.downloadSecure);
 

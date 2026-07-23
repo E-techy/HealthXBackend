@@ -149,25 +149,56 @@ exports.shareWithUser = async (req, res) => {
     }
 };
 
-// 5. Download Public Document
+// 5. Download Public Document (Checks for Password)
 exports.downloadPublic = async (req, res) => {
     try {
         const { publicKey } = req.params;
         
         const access = await DocumentAccess.findOne({ publicKey, isPublic: true }).populate('documentId');
         if (!access || !access.documentId) {
-            console.warn(`[DocsManager] ⚠️ Failed public access attempt with key: ${publicKey}`);
             return res.status(404).json({ success: false, message: "Invalid or inactive public link." });
+        }
+
+        // NEW LOGIC: If it has a password, reject the GET request and tell the client to ask for a password
+        if (access.passwordHash) {
+            return res.status(401).json({ 
+                success: false, 
+                isPasswordProtected: true, 
+                message: "This document is password protected." 
+            });
         }
 
         const doc = access.documentId;
         safeDownload(res, doc.serverPath, doc.documentName, doc._id);
     } catch (error) {
-        console.error(`[DocsManager] ❌ DOWNLOAD PUBLIC ERROR:`, error.message, error.stack);
         res.status(500).json({ success: false, message: "Error accessing public document." });
     }
 };
 
+// 5b. NEW: Download Public Document WITH Password
+exports.downloadPublicSecure = async (req, res) => {
+    try {
+        const { publicKey } = req.params;
+        const { password } = req.body;
+
+        if (!password) return res.status(400).json({ success: false, message: "Password is required." });
+
+        const access = await DocumentAccess.findOne({ publicKey, isPublic: true }).populate('documentId');
+        if (!access || !access.documentId) {
+            return res.status(404).json({ success: false, message: "Invalid or inactive public link." });
+        }
+
+        const isMatch = await bcrypt.compare(password, access.passwordHash);
+        if (!isMatch) {
+            return res.status(401).json({ success: false, message: "Incorrect password." });
+        }
+
+        const doc = access.documentId;
+        safeDownload(res, doc.serverPath, doc.documentName, doc._id);
+    } catch (error) {
+        res.status(500).json({ success: false, message: "Error validating secure access." });
+    }
+};
 // 6. Download Password Protected Document
 exports.downloadSecure = async (req, res) => {
     try {
