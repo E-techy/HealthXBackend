@@ -3,7 +3,9 @@ const DocumentAccess = require('../models/DocumentAccess');
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const fs = require('fs');
+const { renderPasswordPage } = require('../utils/publicDocTemplate');
 
+// Helper to force file download (attachment)
 const safeDownload = (res, filePath, fileName, docId) => {
     res.download(filePath, fileName, (err) => {
         if (err) {
@@ -12,7 +14,21 @@ const safeDownload = (res, filePath, fileName, docId) => {
                 res.status(404).json({ success: false, message: "File could not be found on the server or transfer failed." });
             }
         } else {
-            console.log(`[DocsManager] ✅ Successfully served DocID ${docId}`);
+            console.log(`[DocsManager] ✅ Successfully downloaded DocID ${docId}`);
+        }
+    });
+};
+
+// Helper to render file inline in the browser
+const safeView = (res, filePath, docId) => {
+    res.sendFile(filePath, (err) => {
+        if (err) {
+            console.error(`[DocsManager] ❌ View Error for DocID ${docId}:`, err.message);
+            if (!res.headersSent) {
+                res.status(404).send("<h2>404 - File could not be found on the server.</h2>");
+            }
+        } else {
+            console.log(`[DocsManager] ✅ Successfully viewed DocID ${docId} inline`);
         }
     });
 };
@@ -23,7 +39,9 @@ exports.uploadDocument = async (req, res) => {
             console.warn(`[DocsManager] ⚠️ Upload attempted without file by user: ${req.user.id}`);
             return res.status(400).json({ success: false, message: "No document file provided." });
         }
+
         const { documentName, documentCategory } = req.body;
+        
         const newDoc = new Document({
             userId: req.user.id,
             documentName: documentName || req.file.originalname,
@@ -31,12 +49,21 @@ exports.uploadDocument = async (req, res) => {
             documentCategory: documentCategory || 'OTHER',
             serverPath: req.file.path
         });
+        
         await newDoc.save();
+
         const access = new DocumentAccess({ documentId: newDoc._id });
         await access.save();
 
-        res.status(201).json({ success: true, message: "Document uploaded successfully.", document: newDoc });
+        console.log(`[DocsManager] ✅ Document uploaded successfully. ID: ${newDoc._id}`);
+        res.status(201).json({
+            success: true,
+            message: "Document uploaded successfully.",
+            document: newDoc
+        });
+
     } catch (error) {
+        console.error(`[DocsManager] ❌ UPLOAD ERROR:`, error.message);
         if (req.file && req.file.path) {
             fs.unlink(req.file.path, () => {});
         }
@@ -114,44 +141,14 @@ exports.downloadPublic = async (req, res) => {
             return res.status(404).send("<h2>404 - Document not found or link has expired.</h2>");
         }
 
-        // If it requires a password, serve the HTML Form!
-        // Note: Returning a 401 ensures the Android App knows it needs a password without crashing.
+        // If it requires a password, serve the HTML Template
         if (access.passwordHash) {
-            const htmlForm = `
-            <!DOCTYPE html>
-            <html lang="en">
-            <head>
-                <meta charset="UTF-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <title>HealthX - Secure Document</title>
-                <style>
-                    body { font-family: system-ui, -apple-system, sans-serif; background-color: #000; color: #fff; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-                    .card { background-color: #1E1E1E; padding: 2.5rem; border-radius: 16px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.5); width: 90%; max-width: 350px; }
-                    h2 { margin-top: 0; color: #64B5F6; }
-                    p { color: #aaa; font-size: 14px; margin-bottom: 1.5rem; }
-                    input { width: 100%; padding: 12px; margin-bottom: 1rem; box-sizing: border-box; border-radius: 8px; border: 1px solid #333; background-color: #121212; color: #fff; font-size: 16px; }
-                    input:focus { outline: none; border-color: #1E88E5; }
-                    button { width: 100%; padding: 14px; border: none; border-radius: 8px; background-color: #1E88E5; color: #fff; font-weight: bold; font-size: 16px; cursor: pointer; transition: 0.2s; }
-                    button:hover { background-color: #1565C0; }
-                </style>
-            </head>
-            <body>
-                <div class="card">
-                    <h2>🔒 Secure Document</h2>
-                    <p>This document is password protected. Enter the password below to access it.</p>
-                    <form action="/api/docs/public/${publicKey}/secure" method="POST">
-                        <input type="password" name="password" placeholder="Enter Password" required autofocus />
-                        <button type="submit">Unlock Document</button>
-                    </form>
-                </div>
-            </body>
-            </html>
-            `;
-            return res.status(401).send(htmlForm);
+            return res.status(401).send(renderPasswordPage(publicKey));
         }
 
+        // If no password is required, render it inline by default in the browser
         const doc = access.documentId;
-        safeDownload(res, doc.serverPath, doc.documentName, doc._id);
+        safeView(res, doc.serverPath, doc._id);
     } catch (error) {
         res.status(500).send("<h2>500 - Error accessing public document.</h2>");
     }
@@ -160,13 +157,13 @@ exports.downloadPublic = async (req, res) => {
 exports.downloadPublicSecure = async (req, res) => {
     try {
         const { publicKey } = req.params;
-        const { password } = req.body;
+        const { password, action } = req.body; // Action will be 'view' or 'download' from HTML form
         
         // Did this come from a Browser HTML form, or the Android App?
         const isBrowserForm = req.is('application/x-www-form-urlencoded');
 
         if (!password) {
-            if (isBrowserForm) return res.status(400).send("<h2>Password is required. Go back and try again.</h2>");
+            if (isBrowserForm) return res.status(400).send(renderPasswordPage(publicKey, "Password is required."));
             return res.status(400).json({ success: false, message: "Password is required." });
         }
 
@@ -178,20 +175,18 @@ exports.downloadPublicSecure = async (req, res) => {
 
         const isMatch = await bcrypt.compare(password, access.passwordHash);
         if (!isMatch) {
-            // If browser: pop up a javascript alert and redirect them back to the form!
-            if (isBrowserForm) {
-                return res.status(401).send(`
-                    <script>
-                        alert("Incorrect password!");
-                        window.history.back();
-                    </script>
-                `);
-            }
+            if (isBrowserForm) return res.status(401).send(renderPasswordPage(publicKey, "Incorrect password. Please try again."));
             return res.status(401).json({ success: false, message: "Incorrect password." });
         }
 
         const doc = access.documentId;
-        safeDownload(res, doc.serverPath, doc.documentName, doc._id);
+
+        // If the browser clicked "View Inline", use safeView. Otherwise force download.
+        if (isBrowserForm && action === 'view') {
+            safeView(res, doc.serverPath, doc._id);
+        } else {
+            safeDownload(res, doc.serverPath, doc.documentName, doc._id);
+        }
     } catch (error) {
         res.status(500).json({ success: false, message: "Error validating secure access." });
     }
