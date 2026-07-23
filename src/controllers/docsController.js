@@ -230,7 +230,7 @@ exports.downloadSecure = async (req, res) => {
 exports.downloadShared = async (req, res) => {
     try {
         const { documentId } = req.params;
-        const userId = req.user.id;
+        const userId = req.user.id; // String from JWT
 
         const access = await DocumentAccess.findOne({ documentId }).populate('documentId');
         if (!access || !access.documentId) {
@@ -238,8 +238,12 @@ exports.downloadShared = async (req, res) => {
         }
 
         const doc = access.documentId;
-        const isOwner = doc.userId.toString() === userId;
-        const isSharedUser = access.sharedWithUsers.includes(userId);
+        
+        // FIX: Cast both to Strings to ensure perfect comparison
+        const isOwner = doc.userId.toString() === userId.toString();
+        
+        // FIX: Check if the userId string exists inside the ObjectId array
+        const isSharedUser = access.sharedWithUsers.some(sharedId => sharedId.toString() === userId.toString());
 
         if (!isOwner && !isSharedUser) {
             console.warn(`[DocsManager] ⚠️ Unauthorized access attempt by UserID: ${userId} for DocID: ${documentId}`);

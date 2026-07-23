@@ -2,6 +2,9 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
+// 🚨 STRICT SECURITY: Block these dangerous file extensions
+const FORBIDDEN_EXTENSIONS = ['.exe', '.bat', '.sh', '.apk', '.msi', '.js', '.cmd', '.vbs', '.php', '.py'];
+
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
         try {
@@ -15,16 +18,20 @@ const storage = multer.diskStorage({
             cb(null, dir);
         } catch (error) {
             console.error("[DocsManager] ❌ Failed to create destination directory:", error.message);
-            // Pass the error to multer so it aborts cleanly
             cb(new Error("Internal server error during file upload initialization."));
         }
     },
     filename: function (req, file, cb) {
         try {
             const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-            // Replace spaces with underscores to prevent URL encoding issues later
-            const safeName = file.originalname.replace(/\s+/g, '_');
-            cb(null, uniqueSuffix + '-' + safeName);
+            
+            // Extract the true extension from the original file
+            const ext = path.extname(file.originalname);
+            // Clean the base name (remove spaces)
+            const safeBaseName = path.basename(file.originalname, ext).replace(/\s+/g, '_');
+            
+            // Reconstruct perfectly: 1784710660982-1234-My_Doc.pdf
+            cb(null, uniqueSuffix + '-' + safeBaseName + ext);
         } catch (error) {
             console.error("[DocsManager] ❌ Error generating filename:", error.message);
             cb(new Error("Failed to process file name."));
@@ -36,7 +43,13 @@ const uploadDocs = multer({
     storage: storage,
     limits: { fileSize: 15 * 1024 * 1024 }, // 15MB limit
     fileFilter: (req, file, cb) => {
-        // You can add logic here to reject executable files like .exe or .sh
+        const ext = path.extname(file.originalname).toLowerCase();
+        
+        if (FORBIDDEN_EXTENSIONS.includes(ext)) {
+            console.warn(`[DocsManager] 🛡️ Security blocked malicious upload attempt. Ext: ${ext}`);
+            return cb(new Error(`Security Alert: File type ${ext} is strictly forbidden.`), false);
+        }
+        
         cb(null, true); 
     }
 });
