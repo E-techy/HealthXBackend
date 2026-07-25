@@ -6,6 +6,16 @@ const { generateJWT, generateOTP } = require('../utils/tokenUtils');
 
 // 1. Initial Signup (Generates OTP)
 exports.signup = async (req, res) => {
+    // --- ADDED LOGS ---
+    console.log(`\n👉 [ROUTE HIT]: Auth Controller -> signup`);
+    console.log(`📦 [BODY DATA]:`, { 
+        email: req.body.email, 
+        name: req.body.name, 
+        password: req.body.password ? '[HIDDEN]' : 'undefined' 
+    });
+    console.log(`📎 [FILE DATA]:`, req.file ? req.file.originalname : 'No file attached');
+    // ------------------
+
     try {
         // Data now comes from a Multipart form
         const { email, password, name } = req.body;
@@ -48,6 +58,11 @@ exports.signup = async (req, res) => {
 
 // 2. Verify OTP for Signup
 exports.verifySignupOTP = async (req, res) => {
+    // --- ADDED LOGS ---
+    console.log(`\n👉 [ROUTE HIT]: Auth Controller -> verifySignupOTP`);
+    console.log(`📦 [BODY DATA]:`, req.body);
+    // ------------------
+
     try {
         const { email, otp } = req.body;
         const user = await UserAuth.findOne({ email });
@@ -84,6 +99,14 @@ exports.verifySignupOTP = async (req, res) => {
 
 // 3. Login
 exports.login = async (req, res) => {
+    // --- ADDED LOGS ---
+    console.log(`\n👉 [ROUTE HIT]: Auth Controller -> login`);
+    console.log(`📦 [BODY DATA]:`, { 
+        email: req.body.email, 
+        password: req.body.password ? '[HIDDEN]' : 'undefined' 
+    });
+    // ------------------
+
     try {
         const { email, password } = req.body;
         const user = await UserAuth.findOne({ email });
@@ -123,6 +146,11 @@ exports.login = async (req, res) => {
 
 // 4. Forgot Password (Send OTP)
 exports.forgotPassword = async (req, res) => {
+    // --- ADDED LOGS ---
+    console.log(`\n👉 [ROUTE HIT]: Auth Controller -> forgotPassword`);
+    console.log(`📦 [BODY DATA]:`, req.body);
+    // ------------------
+
     try {
         const { email } = req.body;
         const user = await UserAuth.findOne({ email });
@@ -147,6 +175,15 @@ exports.forgotPassword = async (req, res) => {
 
 // 5. Reset Password
 exports.resetPassword = async (req, res) => {
+    // --- ADDED LOGS ---
+    console.log(`\n👉 [ROUTE HIT]: Auth Controller -> resetPassword`);
+    console.log(`📦 [BODY DATA]:`, { 
+        email: req.body.email, 
+        otp: req.body.otp, 
+        newPassword: req.body.newPassword ? '[HIDDEN]' : 'undefined' 
+    });
+    // ------------------
+
     try {
         const { email, otp, newPassword } = req.body;
         const user = await UserAuth.findOne({ email });
