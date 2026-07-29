@@ -1,11 +1,23 @@
 const Reminder = require('../models/Reminder');
 const mongoose = require('mongoose');
 
+// ==========================================
 // STANDARD CREATE
+// ==========================================
 exports.createReminders = async (req, res) => {
+    const userId = req.user.id;
+    const logPrefix = `[ReminderController - Create | User: ${userId}]`;
+    console.log(`\n${logPrefix} ================= NEW REQUEST =================`);
+
     try {
         const { reminders } = req.body;
-        const userId = req.user.id;
+        
+        if (!reminders || !Array.isArray(reminders) || reminders.length === 0) {
+            console.warn(`${logPrefix} Warning: No reminders provided in the request body.`);
+            return res.status(400).json({ success: false, message: "No reminders provided." });
+        }
+
+        console.log(`${logPrefix} Attempting to create ${reminders.length} reminder(s).`);
 
         const remindersWithUser = reminders.map(r => ({ ...r, userId }));
 
@@ -13,33 +25,55 @@ exports.createReminders = async (req, res) => {
         // and applies the specific Discriminator schema!
         const insertedDocs = await Reminder.insertMany(remindersWithUser);
 
-        res.status(201).json({
+        console.log(`${logPrefix} Success: ${insertedDocs.length} reminder(s) saved to DB.`);
+        console.log(`${logPrefix} ================= REQUEST COMPLETE =================\n`);
+
+        return res.status(201).json({
             success: true,
             message: `${insertedDocs.length} reminders created successfully.`,
             insertedIds: insertedDocs.map(doc => doc._id)
         });
     } catch (error) {
-        // If a client sends dosageAmount to a HYDRATION reminder, 
-        // it will get caught here as a StrictModeError/ValidationError.
-        console.error("🔥 CREATE REMINDERS CRASH:", error.message);
-        res.status(400).json({ success: false, message: error.message });
+        console.error(`${logPrefix} 🔥 CRASH in createReminders:`, error.message);
+        return res.status(400).json({ 
+            success: false, 
+            message: "Failed to create reminders. Please check your data format.",
+            error: error.message 
+        });
     }
 };
 
+// ==========================================
 // OFFLINE AUTO-SYNC
+// ==========================================
 exports.syncReminders = async (req, res) => {
+    const userId = req.user.id;
+    const logPrefix = `[ReminderController - Sync | User: ${userId}]`;
+    console.log(`\n${logPrefix} ================= NEW REQUEST =================`);
+
     try {
         const { lastClientSyncTime, clientPendingUploads } = req.body;
-        const userId = req.user.id;
+        
+        console.log(`${logPrefix} Sync initiated. Last Client Sync: ${lastClientSyncTime || 'Never'}`);
+        console.log(`${logPrefix} Pending client uploads: ${clientPendingUploads ? clientPendingUploads.length : 0}`);
 
-        if (clientPendingUploads && clientPendingUploads.length > 0) {
+        // 1. Process Client Uploads (Upsert)
+        if (clientPendingUploads && Array.isArray(clientPendingUploads) && clientPendingUploads.length > 0) {
+            console.log(`${logPrefix} Building bulk operations for ${clientPendingUploads.length} items...`);
+            
             const bulkOps = clientPendingUploads.map(reminder => {
                 const updateData = { ...reminder, userId };
-                const queryId = reminder._id ? new mongoose.Types.ObjectId(reminder._id) : new mongoose.Types.ObjectId();
+                
+                // Ensure safe ObjectId generation
+                let queryId;
+                try {
+                    queryId = reminder._id ? new mongoose.Types.ObjectId(reminder._id) : new mongoose.Types.ObjectId();
+                } catch (idErr) {
+                    queryId = new mongoose.Types.ObjectId(); // Fallback if client sent a bad ID format
+                }
+                
                 delete updateData._id; 
 
-                // Mongoose bulkWrite perfectly supports discriminators. 
-                // As long as updateData contains the 'category' field, it validates correctly.
                 return {
                     updateOne: {
                         filter: { _id: queryId, userId: userId },
@@ -49,24 +83,35 @@ exports.syncReminders = async (req, res) => {
                 };
             });
             
-            await Reminder.bulkWrite(bulkOps, { strict: 'throw' });
+            const bulkResult = await Reminder.bulkWrite(bulkOps, { strict: 'throw' });
+            console.log(`${logPrefix} Bulk write complete. Modified: ${bulkResult.modifiedCount}, Upserted: ${bulkResult.upsertedCount}`);
         }
 
+        // 2. Fetch Server Updates for Client
         const syncTimeDate = new Date(lastClientSyncTime || 0); 
+        console.log(`${logPrefix} Fetching server records updated after: ${syncTimeDate.toISOString()}`);
+        
         const serverNewerReminders = await Reminder.find({
             userId: userId,
             updatedAt: { $gt: syncTimeDate }
         });
 
-        res.status(200).json({
+        console.log(`${logPrefix} Success: Sending ${serverNewerReminders.length} updated record(s) back to client.`);
+        console.log(`${logPrefix} ================= REQUEST COMPLETE =================\n`);
+
+        return res.status(200).json({
             success: true,
             serverCurrentTime: Date.now(),
             updatedReminders: serverNewerReminders
         });
 
     } catch (error) {
-        console.error("🔥 SYNC CRASH:", error.message);
-        res.status(400).json({ success: false, message: error.message });
+        console.error(`${logPrefix} 🔥 CRASH in syncReminders:`, error.message);
+        return res.status(400).json({ 
+            success: false, 
+            message: "Sync failed.", 
+            error: error.message 
+        });
     }
 };
 
@@ -74,35 +119,81 @@ exports.syncReminders = async (req, res) => {
 // ADVANCED GET ROUTE
 // ==========================================
 exports.getRemindersAdvanced = async (req, res) => {
+    const userId = req.user.id;
+    const logPrefix = `[ReminderController - Get Adv | User: ${userId}]`;
+    console.log(`\n${logPrefix} ================= NEW REQUEST =================`);
+
     try {
-        const userId = req.user.id;
-        // Using query parameters for GET requests (e.g., ?afterDate=1719244800000&ids=id1,id2)
         const { afterDate, ids } = req.query; 
-        
         let query = { userId: userId };
 
-        // Filter 1: Get reminders updated after a specific epoch timestamp
+        console.log(`${logPrefix} Query Params -> afterDate: ${afterDate || 'None'}, ids: ${ids ? 'Provided' : 'None'}`);
+
         if (afterDate) {
             query.updatedAt = { $gt: Number(afterDate) };
         }
         
-        // Filter 2: Get specific reminders by an array of IDs
         if (ids) {
-            // Split the comma-separated string from the URL into an array
-            const idArray = ids.split(',');
+            const idArray = ids.split(',').map(id => id.trim());
             query._id = { $in: idArray };
         }
 
+        console.log(`${logPrefix} Executing DB query...`);
         const reminders = await Reminder.find(query);
         
-        res.status(200).json({ 
+        console.log(`${logPrefix} Success: Fetched ${reminders.length} reminder(s).`);
+        console.log(`${logPrefix} ================= REQUEST COMPLETE =================\n`);
+
+        return res.status(200).json({ 
             success: true, 
             count: reminders.length,
             data: reminders 
         });
     } catch (error) {
-        console.error("🔥 GET REMINDERS CRASH:", error.message);
-        res.status(500).json({ success: false, message: "Server error fetching reminders." });
+        console.error(`${logPrefix} 🔥 CRASH in getRemindersAdvanced:`, error.message);
+        return res.status(500).json({ 
+            success: false, 
+            message: "Server error fetching reminders.",
+            error: error.message
+        });
+    }
+};
+
+// ==========================================
+// SINGLE UPDATE (Added for Router Compatibility)
+// ==========================================
+exports.updateReminder = async (req, res) => {
+    const userId = req.user.id;
+    const { id } = req.params;
+    const logPrefix = `[ReminderController - Single Update | User: ${userId}]`;
+    console.log(`\n${logPrefix} ================= NEW REQUEST =================`);
+
+    try {
+        console.log(`${logPrefix} Updating reminder ID: ${id}`);
+        
+        const updateData = { ...req.body };
+        delete updateData._id;
+        delete updateData.userId;
+        delete updateData.category; // Protect discriminator
+
+        const updatedReminder = await Reminder.findOneAndUpdate(
+            { _id: id, userId: userId },
+            { $set: updateData },
+            { new: true, runValidators: true, strict: 'throw' }
+        );
+
+        if (!updatedReminder) {
+            console.warn(`${logPrefix} Warning: Reminder not found or unauthorized.`);
+            return res.status(404).json({ success: false, message: "Reminder not found." });
+        }
+
+        console.log(`${logPrefix} Success: Reminder updated.`);
+        console.log(`${logPrefix} ================= REQUEST COMPLETE =================\n`);
+
+        return res.status(200).json({ success: true, data: updatedReminder });
+    } catch (error) {
+        console.error(`${logPrefix} 🔥 CRASH in updateReminder:`, error.message);
+        return res.status(400).json({ success: false, message: error.message });
     }
 };
 
@@ -110,21 +201,26 @@ exports.getRemindersAdvanced = async (req, res) => {
 // ADVANCED BULK UPDATE
 // ==========================================
 exports.bulkUpdateReminders = async (req, res) => {
-    try {
-        const userId = req.user.id;
-        const { updates } = req.body; // Expects an array of { id: "...", changes: { ... } }
+    const userId = req.user.id;
+    const logPrefix = `[ReminderController - Bulk Update | User: ${userId}]`;
+    console.log(`\n${logPrefix} ================= NEW REQUEST =================`);
 
-        if (!updates || updates.length === 0) {
+    try {
+        const { updates } = req.body; 
+
+        if (!updates || !Array.isArray(updates) || updates.length === 0) {
+            console.warn(`${logPrefix} Warning: No updates provided.`);
             return res.status(400).json({ success: false, message: "No updates provided." });
         }
+
+        console.log(`${logPrefix} Processing ${updates.length} update operation(s).`);
 
         const bulkOps = updates.map(item => {
             const updateData = { ...item.changes };
             
-            // Security: Never let the client change the Document ID or the User ID
             delete updateData._id; 
             delete updateData.userId;
-            delete updateData.category; // Do not allow changing the discriminator type
+            delete updateData.category; 
 
             return {
                 updateOne: {
@@ -134,17 +230,23 @@ exports.bulkUpdateReminders = async (req, res) => {
             };
         });
 
-        // strict: 'throw' ensures that if an update contains invalid fields for that discriminator, it fails safely
         const result = await Reminder.bulkWrite(bulkOps, { strict: 'throw' });
 
-        res.status(200).json({ 
+        console.log(`${logPrefix} Success: ${result.modifiedCount} document(s) modified.`);
+        console.log(`${logPrefix} ================= REQUEST COMPLETE =================\n`);
+
+        return res.status(200).json({ 
             success: true, 
             message: "Bulk update successful.",
             modifiedCount: result.modifiedCount 
         });
     } catch (error) {
-        console.error("🔥 BULK UPDATE CRASH:", error.message);
-        res.status(400).json({ success: false, message: error.message });
+        console.error(`${logPrefix} 🔥 CRASH in bulkUpdateReminders:`, error.message);
+        return res.status(400).json({ 
+            success: false, 
+            message: "Failed to update reminders.",
+            error: error.message 
+        });
     }
 };
 
@@ -152,37 +254,46 @@ exports.bulkUpdateReminders = async (req, res) => {
 // ADVANCED DELETION
 // ==========================================
 exports.deleteRemindersAdvanced = async (req, res) => {
+    const userId = req.user.id;
+    const logPrefix = `[ReminderController - Delete Adv | User: ${userId}]`;
+    console.log(`\n${logPrefix} ================= NEW REQUEST =================`);
+
     try {
-        const userId = req.user.id;
         const { reminderIds, createdAfterDate, category, deleteAll } = req.body;
-        
         let query = { userId: userId };
 
-        // Determine the deletion strategy based on the payload
         if (deleteAll === true) {
-            // Leave query as just { userId } to wipe their entire slate
-        } else if (reminderIds && reminderIds.length > 0) {
-            // Delete specific array of IDs
+            console.log(`${logPrefix} Action: Wiping ALL reminders for user.`);
+        } else if (reminderIds && Array.isArray(reminderIds) && reminderIds.length > 0) {
+            console.log(`${logPrefix} Action: Deleting specific array of ${reminderIds.length} IDs.`);
             query._id = { $in: reminderIds };
         } else if (createdAfterDate) {
-            // Delete anything created after a specific date (e.g., rollback bad sync)
+            console.log(`${logPrefix} Action: Deleting reminders created after ${createdAfterDate}.`);
             query.createdAt = { $gt: Number(createdAfterDate) };
         } else if (category) {
-            // Delete all reminders of a specific type (e.g., user wants to wipe all "SLEEP" logs)
+            console.log(`${logPrefix} Action: Deleting all reminders in category '${category}'.`);
             query.category = category;
         } else {
+            console.warn(`${logPrefix} Warning: No valid deletion criteria provided.`);
             return res.status(400).json({ success: false, message: "No valid deletion criteria provided." });
         }
 
         const result = await Reminder.deleteMany(query);
 
-        res.status(200).json({ 
+        console.log(`${logPrefix} Success: ${result.deletedCount} reminder(s) deleted.`);
+        console.log(`${logPrefix} ================= REQUEST COMPLETE =================\n`);
+
+        return res.status(200).json({ 
             success: true, 
             message: "Deletion completed.",
             deletedCount: result.deletedCount 
         });
     } catch (error) {
-        console.error("🔥 DELETION CRASH:", error.message);
-        res.status(500).json({ success: false, message: "Server error deleting reminders." });
+        console.error(`${logPrefix} 🔥 CRASH in deleteRemindersAdvanced:`, error.message);
+        return res.status(500).json({ 
+            success: false, 
+            message: "Server error deleting reminders.",
+            error: error.message
+        });
     }
 };
