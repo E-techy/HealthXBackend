@@ -34,6 +34,30 @@ const logSummary = (resData) => {
     }
 };
 
+// const logSummary = (resData) => {
+//     console.log(`\n${colors.bright}${colors.green}✔ Status: OK | DataType: [${resData.dataType}] | ClientMapType: [${resData.clientMapType}]${colors.reset}`);
+    
+//     if (resData.data && resData.data.routes) {
+//         console.log(`${colors.magenta}Total Routes Returned: ${resData.data.routes.length}${colors.reset}`);
+//         resData.data.routes.forEach((route, idx) => {
+//             console.log(`  ${colors.bright}Route #${idx + 1}:${colors.reset}`);
+//             console.log(`    - Labels: ${route.routeLabels ? route.routeLabels.join(', ') : 'DEFAULT'}`);
+//             console.log(`    - Distance: ${route.distanceMeters ? (route.distanceMeters / 1000).toFixed(2) + ' km' : 'N/A'}`);
+//             console.log(`    - Duration: ${route.duration || 'N/A'}`);
+//             if (route.travelAdvisory?.fuelConsumptionMicroliters) {
+//                 console.log(`    - Est. Fuel: ${(route.travelAdvisory.fuelConsumptionMicroliters / 1000000).toFixed(2)} Liters`);
+//             }
+            
+//             // ADD THESE TWO LINES TO SEE THE POLYLINE STRING
+//             if (route.polyline?.encodedPolyline) {
+//                 console.log(`    - Blue Line Polyline: ${route.polyline.encodedPolyline.substring(0, 45)}... (truncated)`);
+//             }
+//         });
+//     } else {
+//         console.log(`${colors.yellow}No route data returned by Google.${colors.reset}`);
+//     }
+// };
+
 const logError = (error) => {
     console.log(`\n${colors.bright}${colors.red}✖ Request Failed:${colors.reset}`);
     if (error.response) {
