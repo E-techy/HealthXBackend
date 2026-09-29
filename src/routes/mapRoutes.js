@@ -3,8 +3,10 @@ const router = express.Router();
 const routeController = require('../controllers/routeController');
 const { requireJWT } = require('../middlewares/authMiddleware');
 
-// Route: POST /api/maps/compute-route
-// The client will send origin, destination, options, and mapType in the POST body
+// PRODUCTION ROUTE (Requires login)
 router.post('/compute-route', requireJWT, routeController.calculateRoute);
+
+// TESTING ROUTE (No JWT required - used ONLY by testRoutesApi.js)
+router.post('/test-compute-route', routeController.calculateRoute);
 
 module.exports = router;

@@ -1,13 +1,7 @@
 const axios = require('axios');
 
-/**
- * Formats a location object from the client into the structure required by Google Routes API.
- * Supports Place ID, Coordinates (lat/lng), or Address Strings.
- */
 const formatLocation = (loc) => {
-    if (loc.placeId) {
-        return { placeId: loc.placeId };
-    }
+    if (loc.placeId) return { placeId: loc.placeId };
     if (loc.latitude && loc.longitude) {
         return {
             location: {
@@ -18,15 +12,10 @@ const formatLocation = (loc) => {
             }
         };
     }
-    if (loc.address) {
-        return { address: loc.address };
-    }
+    if (loc.address) return { address: loc.address };
     throw new Error("Invalid location format provided.");
 };
 
-/**
- * Builds the comprehensive X-Goog-FieldMask based on the requested features.
- */
 const buildFieldMask = (options) => {
     const baseFields = [
         'routes.distanceMeters',
@@ -44,12 +33,9 @@ const buildFieldMask = (options) => {
         'routes.legs.steps.travelMode'
     ];
 
-    // Add transit specific fields if requested
     if (options.travelMode === 'TRANSIT') {
         baseFields.push('routes.legs.steps.transitDetails');
     }
-
-    // Add fuel consumption fields if eco-friendly routing is requested
     if (options.extraComputations && options.extraComputations.includes('FUEL_CONSUMPTION')) {
         baseFields.push('routes.travelAdvisory.fuelConsumptionMicroliters');
     }
@@ -57,65 +43,62 @@ const buildFieldMask = (options) => {
     return baseFields.join(',');
 };
 
-/**
- * Core function to communicate with Google Routes API.
- */
 const fetchGoogleRoute = async (clientData) => {
     const apiKey = process.env.MAPS_ROUTES_API_KEY;
-    if (!apiKey) throw new Error("Maps API key is not configured on the server.");
+    if (!apiKey) throw new Error("MAPS_ROUTES_API_KEY is not configured in .env");
 
     const {
-        origin,
-        destination,
-        travelMode = 'DRIVE',
-        routingPreference = 'TRAFFIC_UNAWARE',
-        computeAlternativeRoutes = false,
-        routeModifiers = {},
-        languageCode = 'en-US',
-        units = 'METRIC',
-        requestedReferenceRoutes,
-        extraComputations,
-        trafficModel,
-        transitPreferences
+        origin, destination, travelMode = 'DRIVE', routingPreference,
+        computeAlternativeRoutes = false, routeModifiers, languageCode = 'en-US',
+        units = 'METRIC', requestedReferenceRoutes, extraComputations,
+        trafficModel, transitPreferences
     } = clientData;
 
-    // 1. Build Payload
+    // Base payload required for all requests
     const payload = {
         origin: formatLocation(origin),
         destination: formatLocation(destination),
         travelMode,
-        routingPreference,
         computeAlternativeRoutes,
-        routeModifiers,
         languageCode,
         units
     };
 
-    // Add optional advanced features if provided by the client
-    if (requestedReferenceRoutes) payload.requestedReferenceRoutes = requestedReferenceRoutes;
-    if (extraComputations) payload.extraComputations = extraComputations;
-    if (trafficModel && routingPreference === 'TRAFFIC_AWARE_OPTIMAL') payload.trafficModel = trafficModel;
-    if (transitPreferences && travelMode === 'TRANSIT') payload.transitPreferences = transitPreferences;
+    // STRICT GOOGLE API RULES: TRANSIT mode rejects certain properties
+    if (travelMode === 'TRANSIT') {
+        if (transitPreferences) payload.transitPreferences = transitPreferences;
+    } else {
+        // Safe to add for DRIVE, TWO_WHEELER, BICYCLE, WALK
+        if (routingPreference) payload.routingPreference = routingPreference;
+        if (routeModifiers && Object.keys(routeModifiers).length > 0) payload.routeModifiers = routeModifiers;
+        if (trafficModel && routingPreference === 'TRAFFIC_AWARE_OPTIMAL') payload.trafficModel = trafficModel;
+        if (requestedReferenceRoutes) payload.requestedReferenceRoutes = requestedReferenceRoutes;
+        if (extraComputations) payload.extraComputations = extraComputations;
+    }
 
-    // 2. Build FieldMask
     const fieldMask = buildFieldMask(clientData);
 
-    // 3. Execute Request
-    const response = await axios.post(
-        'https://routes.googleapis.com/directions/v2:computeRoutes',
-        payload,
-        {
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Goog-Api-Key': apiKey,
-                'X-Goog-FieldMask': fieldMask
+    try {
+        const response = await axios.post(
+            'https://routes.googleapis.com/directions/v2:computeRoutes',
+            payload,
+            {
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Goog-Api-Key': apiKey,
+                    'X-Goog-FieldMask': fieldMask
+                }
             }
+        );
+        return response.data;
+    } catch (error) {
+        // Deep error extraction so we can actually see Google's complaints
+        if (error.response && error.response.data) {
+            console.error("❌ GOOGLE API REJECTED REQUEST:", JSON.stringify(error.response.data, null, 2));
+            throw new Error(`Google API Error: ${error.response.data.error?.message || 'Check Server Logs'}`);
         }
-    );
-
-    return response.data;
+        throw error; // Throw standard network errors
+    }
 };
 
-module.exports = {
-    fetchGoogleRoute
-};
+module.exports = { fetchGoogleRoute };

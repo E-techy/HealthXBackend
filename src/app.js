@@ -42,9 +42,11 @@ app.use('/api/access', accessRoutes);
 
 app.use('/api/docs', docsRoutes);
 
+app.use('/api/maps', mapRoutes);
+
 app.use('/api/config', configRoutes);
 
-app.use('/api/maps', mapRoutes);
+
 
 app.use((err, req, res, next) => {
     console.error(err.stack);
