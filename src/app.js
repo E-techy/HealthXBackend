@@ -6,6 +6,7 @@ const deviceRoutes = require('./routes/deviceRoutes');
 const nutritionRoutes = require('./routes/nutritionRoutes');
 const settingRoutes = require('./routes/settingRoutes');
 const accessRoutes = require('./routes/accessRoutes');
+const configRoutes = require('./routes/configRoutes');
 
 // ADD THIS IMPORT
 const docsRoutes = require('./routes/docsRoutes');
@@ -39,6 +40,8 @@ app.use('/api/settings', settingRoutes);
 app.use('/api/access', accessRoutes);
 
 app.use('/api/docs', docsRoutes);
+
+app.use('/api/config', configRoutes);
 
 app.use((err, req, res, next) => {
     console.error(err.stack);
