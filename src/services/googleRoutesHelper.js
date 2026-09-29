@@ -61,7 +61,7 @@ const buildFieldMask = (options) => {
  * Core function to communicate with Google Routes API.
  */
 const fetchGoogleRoute = async (clientData) => {
-    const apiKey = process.env.MAPS_JAVASCRIPT_API_KEY;
+    const apiKey = process.env.MAPS_ROUTES_API_KEY;
     if (!apiKey) throw new Error("Maps API key is not configured on the server.");
 
     const {
