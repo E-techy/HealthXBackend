@@ -20,10 +20,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const targetPanel = document.getElementById(targetId);
             const isCurrentlyActive = btn.classList.contains('active');
 
-            // Close everything first
             closeAllPanels();
 
-            // If it wasn't active, open it
             if (!isCurrentlyActive) {
                 btn.classList.add('active');
                 targetPanel.classList.remove('hidden');
@@ -44,19 +42,23 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- 3. AUTO-COLLAPSE ON INACTIVITY ---
-    // Listen for mouse movement anywhere on the window. 
-    // If a panel is open and the mouse stops moving for 5 seconds, collapse.
-    window.addEventListener('mousemove', () => {
-        if (isPanelOpen) {
-            resetInactivityTimer();
-        }
+    // FIXED: Now listens to mouse AND keyboard so it doesn't close while typing!
+    const activityEvents = ['mousemove', 'mousedown', 'keydown', 'touchstart'];
+    
+    activityEvents.forEach(evt => {
+        window.addEventListener(evt, () => {
+            if (isPanelOpen) {
+                resetInactivityTimer();
+            }
+        });
     });
 
     function resetInactivityTimer() {
         clearTimeout(inactivityTimer);
+        // Extended to 15 seconds for a better UX while typing addresses
         inactivityTimer = setTimeout(() => {
             closeAllPanels();
-        }, 5000); // 5 seconds of no mouse movement
+        }, 15000); 
     }
 
     // --- 4. THEME TOGGLE ---
@@ -65,7 +67,6 @@ document.addEventListener('DOMContentLoaded', () => {
         document.body.setAttribute('data-theme', currentTheme);
         localStorage.setItem('healthx_theme', currentTheme);
         
-        // Tell the 2D map to update its colors
         if (window.EventBus) {
             window.EventBus.emit('theme_changed', currentTheme);
         }

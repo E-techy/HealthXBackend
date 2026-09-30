@@ -110,12 +110,37 @@ body { font-family: 'Inter', sans-serif; overflow: hidden; background: #000; col
     border-radius: 6px; padding-right: 4px; transition: all 0.2s;
 }
 .input-with-actions:focus-within { border-color: var(--accent); }
-.input-with-actions input {
+/* Target both the default input and the newly injected gmp-place-autocomplete web component */
+.input-with-actions input,
+.input-with-actions gmp-place-autocomplete {
     flex-grow: 1; border: none; background: transparent; padding: 10px; color: var(--text-main); 
     outline: none; font-size: 0.8rem; text-overflow: ellipsis; overflow: hidden;
 }
+
 /* When input is editable (autocomplete active) */
-.input-with-actions input:not([readonly]) { background: rgba(59, 130, 246, 0.1); }
+.input-with-actions input:not([readonly]),
+.input-with-actions gmp-place-autocomplete:not([readonly]) { 
+    background: rgba(59, 130, 246, 0.1); 
+}
+
+/* --- GOOGLE PLACES AUTOCOMPLETE FIXES --- */
+/* Target internal input of the web component if Shadow DOM allows */
+gmp-place-autocomplete::part(input) {
+    background: transparent;
+    color: var(--text-main);
+    border: none;
+    outline: none;
+    padding: 10px 0;
+}
+
+.pac-container {
+    z-index: 10000 !important; background-color: var(--tooltip-bg); border: 1px solid var(--border-color);
+    box-shadow: var(--shadow); border-radius: 0 0 6px 6px; font-family: 'Inter', sans-serif;
+}
+.pac-item { color: var(--text-main); border-top: 1px solid var(--border-color); padding: 8px; cursor: pointer;}
+.pac-item:hover { background-color: var(--border-color); }
+.pac-item-query { color: var(--accent); font-weight: 600; }
+
 
 .action-icon {
     background: transparent; border: none; color: var(--text-muted); width: 28px; height: 28px; 

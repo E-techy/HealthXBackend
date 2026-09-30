@@ -5,10 +5,7 @@ class MarkerManager {
         this.markers = new Map(); 
         this.markerTimeouts = {}; 
         
-        // Google APIs
         this.AdvancedMarkerElement = null;
-        this.Autocomplete = null;
-        this.autocompleteInstances = {}; // Store autocomplete instances by pointId
 
         this.mapContainer = document.getElementById('map-container');
         this.checkpointsList = document.getElementById('checkpoints-list');
@@ -20,13 +17,10 @@ class MarkerManager {
     async initGoogleLibraries() {
         if (!this.AdvancedMarkerElement) {
             const { AdvancedMarkerElement } = await google.maps.importLibrary("marker");
-            const { Autocomplete } = await google.maps.importLibrary("places");
             this.AdvancedMarkerElement = AdvancedMarkerElement;
-            this.Autocomplete = Autocomplete;
         }
     }
 
-    // Convert raw coords to N/S/E/W format
     formatGPS(lat, lng) {
         const latDir = lat >= 0 ? 'N' : 'S';
         const lngDir = lng >= 0 ? 'E' : 'W';
@@ -36,20 +30,17 @@ class MarkerManager {
     bindEvents() {
         this.btnAddCheckpoint.addEventListener('click', () => this.addCheckpointRow());
 
-        // Delegate clicks for the entire Routing Panel
         document.getElementById('route-points-container').addEventListener('click', (e) => {
             const row = e.target.closest('.point-row');
             if (!row) return;
 
             const pointId = row.getAttribute('data-id');
 
-            // Header Click -> Toggle Collapse
             if (e.target.closest('.row-header')) {
                 row.classList.toggle('expanded');
                 return;
             }
 
-            // Actions
             if (e.target.closest('.btn-map')) {
                 this.startPickingMode(pointId);
             } else if (e.target.closest('.btn-loc')) {
@@ -65,12 +56,10 @@ class MarkerManager {
             }
         });
 
-        // Listen for Custom Name typing
         document.getElementById('route-points-container').addEventListener('input', (e) => {
             if (e.target.classList.contains('custom-name-input')) {
                 const row = e.target.closest('.point-row');
                 const titleEl = row.querySelector('.row-title');
-                // Only update the title if it's a checkpoint. Origin/Dest names are fixed.
                 if (row.getAttribute('data-id').startsWith('cp_')) {
                     const defaultName = `Checkpoint ${row.getAttribute('data-seq')}`;
                     titleEl.textContent = e.target.value.trim() || defaultName;
@@ -78,49 +67,47 @@ class MarkerManager {
             }
         });
 
-        // EventBus Map Click
         if (window.EventBus) {
             window.EventBus.on('map_clicked', this.handleMapClick.bind(this));
         }
     }
 
-    // --- PLACES AUTOCOMPLETE ---
+    // --- REFACTORED FOR PLACES API (NEW) ---
     async enableAddressEdit(pointId) {
-        await this.initGoogleLibraries();
-        
-        const input = document.getElementById(`input-${pointId}`);
-        input.readOnly = false;
-        input.value = ''; // Clear it so they can type
-        input.focus();
+        let input = document.getElementById(`input-${pointId}`);
 
-        // Attach autocomplete if not already attached
-        if (!this.autocompleteInstances[pointId]) {
-            const autocomplete = new this.Autocomplete(input, { fields: ["geometry", "name", "formatted_address"] });
-            this.autocompleteInstances[pointId] = autocomplete;
-
-            autocomplete.addListener("place_changed", () => {
-                const place = autocomplete.getPlace();
-                if (place.geometry && place.geometry.location) {
-                    const lat = place.geometry.location.lat();
-                    const lng = place.geometry.location.lng();
-                    const displayName = place.name || place.formatted_address;
-                    
-                    this.setPointData(pointId, lat, lng, displayName);
-                    
-                    // Re-lock input
-                    input.readOnly = true;
-                    // Pan map
-                    if (window.EventBus) window.EventBus.emit('update_location', {lat, lng});
+        if (window.placesAutocompleteService) {
+            // Wait for the service to attach and potentially swap the DOM node
+            input = await window.placesAutocompleteService.attachToInput(input, (placeData) => {
+                
+                // Plot marker, set data, and re-lock the input
+                this.setPointData(pointId, placeData.lat, placeData.lng, placeData.displayName).then(() => {
+                    const currentInput = document.getElementById(`input-${pointId}`);
+                    if (currentInput) {
+                        currentInput.setAttribute('readonly', 'true');
+                        currentInput.readOnly = true;
+                    }
+                });
+                
+                // Pan map to the searched location
+                if (window.EventBus) {
+                    window.EventBus.emit('update_location', { lat: placeData.lat, lng: placeData.lng });
                 }
             });
         }
+
+        // Standardize properties to account for custom web components
+        input.removeAttribute('readonly');
+        input.readOnly = false;
+        input.value = ''; 
+        
+        // Timeout ensures the shadow DOM is fully painted before requesting focus
+        setTimeout(() => input.focus(), 50);
     }
 
-    // --- CROSSHAIR PICKING ---
     startPickingMode(pointId) {
         this.pickingForId = pointId;
         this.mapContainer.style.cursor = 'crosshair';
-        console.log(`Waiting for click on map to place: ${pointId}...`);
     }
 
     handleMapClick(data) {
@@ -130,7 +117,6 @@ class MarkerManager {
         this.mapContainer.style.cursor = 'default';
     }
 
-    // --- GPS LOCATION ---
     getDeviceLocation(pointId) {
         if (!navigator.geolocation) return alert("Geolocation not supported.");
         navigator.geolocation.getCurrentPosition(
@@ -143,7 +129,6 @@ class MarkerManager {
         );
     }
 
-    // --- CREATE / UPDATE DATA & MARKER ---
     async setPointData(pointId, lat, lng, customString = null) {
         await this.initGoogleLibraries();
         const row = document.querySelector(`.point-row[data-id="${pointId}"]`);
@@ -156,10 +141,8 @@ class MarkerManager {
         if (input) input.value = displayValue;
         if (summary) summary.textContent = displayValue;
         
-        // Auto-collapse row to save space once location is set
         row.classList.remove('expanded');
 
-        // Logic for Add Checkpoint Button Visibility
         if (pointId === 'origin') {
             this.btnAddCheckpoint.style.display = 'block';
         }
@@ -170,13 +153,11 @@ class MarkerManager {
         else if (pointId === 'destination') { typeClass = 'destination'; }
         else { visualLabel = `<div class="seq-num">${row.getAttribute('data-seq')}</div>`; }
 
-        // Remove old
         if (this.markers.has(pointId)) {
             this.markers.get(pointId).map = null;
             this.markers.delete(pointId);
         }
 
-        // Create Marker Element
         const el = document.createElement('div');
         el.className = `tactical-marker ${typeClass}`;
         el.innerHTML = `
@@ -189,14 +170,13 @@ class MarkerManager {
             </div>
             <div class="marker-edit-panel">
                 <button class="icon-option">⛽</button>
-                <button class="icon-option">⚕️</button>
+                <button class="icon-option">⚕️️</button>
                 <button class="icon-option">💥</button>
                 <button class="icon-option">🚓</button>
                 <button class="icon-option">📍</button>
             </div>
         `;
 
-        // Marker UI Events
         el.addEventListener('click', (e) => {
             e.stopPropagation();
             document.querySelectorAll('.tactical-marker').forEach(m => m.classList.remove('show-controls'));
@@ -226,7 +206,6 @@ class MarkerManager {
             });
         });
 
-        // Attach to Google Maps 2D
         if (window.flatMapEngine && window.flatMapEngine.map2D) {
             const gMarker = new this.AdvancedMarkerElement({
                 map: window.flatMapEngine.map2D,
@@ -250,7 +229,6 @@ class MarkerManager {
         }
     }
 
-    // --- CHECKPOINT SEQUENCE RECALCULATION ---
     updateCheckpointSequences() {
         let seq = 1;
         const checkpointRows = document.querySelectorAll('#checkpoints-list .point-row');
@@ -259,14 +237,12 @@ class MarkerManager {
             const id = row.getAttribute('data-id');
             row.setAttribute('data-seq', seq);
             
-            // If the user hasn't typed a custom name, update the default title
             const nameInput = row.querySelector('.custom-name-input');
             const titleEl = row.querySelector('.row-title');
             if (!nameInput.value.trim()) {
                 titleEl.textContent = `Checkpoint ${seq}`;
             }
 
-            // Update Marker UI Bubble Number
             const marker = this.markers.get(id);
             if (marker) {
                 const el = marker.content;
@@ -285,17 +261,19 @@ class MarkerManager {
         const input = document.getElementById(`input-${pointId}`);
         const summary = document.querySelector(`.point-row[data-id="${pointId}"] .row-summary`);
         
-        if (input) input.value = '';
+        if (input) {
+            input.value = '';
+            input.setAttribute('readonly', 'true');
+            input.readOnly = true;
+        }
         if (summary) summary.textContent = 'Select location...';
         
-        // Hide add button if Origin is deleted
         if (pointId === 'origin') {
             this.btnAddCheckpoint.style.display = 'none';
         }
 
         if (pointId.startsWith('cp_')) {
             document.querySelector(`.point-row[data-id="${pointId}"]`)?.remove();
-            // Critical: Re-index remaining checkpoints
             this.updateCheckpointSequences();
         }
     }
@@ -328,8 +306,6 @@ class MarkerManager {
             </div>
         `;
         this.checkpointsList.insertAdjacentHTML('beforeend', rowHTML);
-        
-        // Immediately assign proper sequence numbers
         this.updateCheckpointSequences();
     }
 
