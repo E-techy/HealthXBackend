@@ -69,105 +69,109 @@ body { font-family: 'Inter', sans-serif; overflow: hidden; background: #000; col
 .dock-btn:not(.active):hover .tooltip { opacity: 1; left: 50px; }
 
 #flyout-container { position: absolute; top: 80px; left: 85px; pointer-events: auto; bottom: 15px; }
+
+/* FIX 1: Removed overflow-y: auto to ensure the dropdown popup is never clipped */
 .flyout-panel {
     background: var(--bg-glass); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
-    border: 1px solid var(--border-color); border-radius: 8px; padding: 20px; width: 340px; max-height: 100%; 
-    overflow-y: auto; box-shadow: var(--shadow); transition: all 0.3s; position: absolute; top: 0; left: 0;
+    border: 1px solid var(--border-color); border-radius: 8px; padding: 20px; width: 360px; max-height: 100%; 
+    overflow: visible; box-shadow: var(--shadow); transition: all 0.3s; position: absolute; top: 0; left: 0;
     opacity: 1; transform: translateX(0); visibility: visible; display: flex; flex-direction: column;
 }
 .flyout-panel.hidden { opacity: 0; transform: translateX(-20px); visibility: hidden; pointer-events: none; }
 .flyout-panel h3 { font-size: 1.1rem; margin-bottom: 15px; font-weight: 700; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;}
 
-/* --- COLLAPSIBLE POINT ROWS --- */
-#route-points-container { display: flex; flex-direction: column; gap: 8px; }
+/* --- GOOGLE MAPS STYLE ROUTING TIMELINE --- */
+.routing-timeline { display: flex; flex-direction: column; width: 100%; position: relative; }
 
-.point-row {
-    background: var(--input-bg); border-radius: 8px; border: 1px solid var(--border-color); 
-    overflow: hidden; transition: 0.3s;
+/* 🌟 Z-INDEX STACKING FIX: Active node floats above others so autocomplete dropdown never clips 🌟 */
+.route-node { 
+    display: flex; align-items: stretch; margin-bottom: 6px; 
+    position: relative; z-index: 1; transition: z-index 0.2s;
+    overflow: visible !important;
 }
-.row-header {
-    display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; 
-    cursor: pointer; background: rgba(0,0,0,0.1);
-}
-.row-header:hover { background: rgba(255,255,255,0.05); }
-.row-title { font-weight: 600; font-size: 0.85rem; width: 30%; }
-.row-summary { font-size: 0.75rem; color: var(--text-muted); flex-grow: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 10px;}
-.btn-toggle-row { background: none; border: none; color: var(--text-muted); cursor: pointer; transition: transform 0.3s; font-size: 0.7rem; }
+.route-node:focus-within { z-index: 99999; } 
 
-.row-body { padding: 12px; display: none; border-top: 1px solid var(--border-color); }
-.point-row.expanded .row-body { display: block; }
-.point-row.expanded .btn-toggle-row { transform: rotate(180deg); }
-
-/* Inputs inside row body */
-.custom-name-input {
-    width: 100%; background: transparent; border: none; border-bottom: 1px dashed var(--border-color);
-    color: var(--text-main); font-size: 0.9rem; padding: 4px 0; margin-bottom: 10px; outline: none; font-weight: 600;
+/* Left Timeline Connectors */
+.node-connector { width: 28px; display: flex; flex-direction: column; align-items: center; position: relative; margin-right: 6px; }
+.dot { 
+    width: 14px; height: 14px; border-radius: 50%; border: 3px solid var(--bg-glass); 
+    box-shadow: 0 0 0 1.5px var(--text-muted); background: transparent; margin-top: 15px; z-index: 2;
 }
-.custom-name-input:focus { border-bottom-color: var(--accent); }
+.origin-dot { box-shadow: 0 0 0 2px #10b981; background: #10b981; }
+.dest-dot { box-shadow: 0 0 0 2px #ef4444; background: #ef4444; }
+.cp-dot { box-shadow: 0 0 0 2px #3b82f6; background: #3b82f6; }
+.add-dot { display: flex; align-items: center; justify-content: center; font-size: 14px; border: none; box-shadow: none; color: var(--text-muted); font-weight: bold; margin-top: 12px;}
 
-.input-with-actions {
-    display: flex; align-items: center; background: rgba(0,0,0,0.2); border: 1px solid var(--border-color);
-    border-radius: 6px; padding-right: 4px; transition: all 0.2s;
-}
-.input-with-actions:focus-within { border-color: var(--accent); }
-/* Target both the default input and the newly injected gmp-place-autocomplete web component */
-.input-with-actions input,
-.input-with-actions gmp-place-autocomplete {
-    flex-grow: 1; border: none; background: transparent; padding: 10px; color: var(--text-main); 
-    outline: none; font-size: 0.8rem; text-overflow: ellipsis; overflow: hidden;
-}
+.line { flex-grow: 1; width: 2px; background: var(--border-color); margin-top: 4px; margin-bottom: -15px; }
+.route-node:last-child .line { display: none; }
 
-/* When input is editable (autocomplete active) */
-.input-with-actions input:not([readonly]),
-.input-with-actions gmp-place-autocomplete:not([readonly]) { 
-    background: rgba(59, 130, 246, 0.1); 
+/* FIX 2: Ensure content wrappers allow overflow */
+.node-content { flex-grow: 1; display: flex; flex-direction: column; justify-content: center; overflow: visible !important; }
+
+/* Google-like Input Wrappers with High Legibility */
+.input-wrapper {
+    display: flex; align-items: center; background: var(--input-bg);
+    border: 1px solid var(--border-color); border-radius: 8px;
+    transition: border-color 0.2s, box-shadow 0.2s; width: 100%;
+    overflow: visible !important;
+}
+.input-wrapper:focus-within {
+    border-color: var(--accent); box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25); background: rgba(59, 130, 246, 0.04);
 }
 
-/* --- GOOGLE PLACES AUTOCOMPLETE FIXES --- */
-/* Target internal input of the web component if Shadow DOM allows */
+/* FIX 3: Removed text-overflow and overflow:hidden which clipped the internal dropdowns */
+.input-wrapper input,
+.input-wrapper gmp-place-autocomplete {
+    flex-grow: 1; border: none; background: transparent;
+    color: var(--text-main); font-size: 14px; font-weight: 500; 
+    padding: 12px 14px; outline: none; width: 100%; 
+}
+
+/* Force New API Web Component to match larger font size inside its Shadow DOM */
 gmp-place-autocomplete::part(input) {
-    background: transparent;
+    font-size: 14px;
+    font-weight: 500;
+    padding: 12px 14px;
     color: var(--text-main);
+    background: transparent;
     border: none;
     outline: none;
-    padding: 10px 0;
+    width: 100%;
 }
 
-.pac-container {
-    z-index: 10000 !important; background-color: var(--tooltip-bg); border: 1px solid var(--border-color);
-    box-shadow: var(--shadow); border-radius: 0 0 6px 6px; font-family: 'Inter', sans-serif;
-}
-.pac-item { color: var(--text-main); border-top: 1px solid var(--border-color); padding: 8px; cursor: pointer;}
-.pac-item:hover { background-color: var(--border-color); }
-.pac-item-query { color: var(--accent); font-weight: 600; }
-
-
+/* Action Icons inside input wrapper */
 .action-icon {
-    background: transparent; border: none; color: var(--text-muted); width: 28px; height: 28px; 
-    border-radius: 4px; cursor: pointer; display: flex; justify-content: center; align-items: center; transition: 0.2s;
+    background: transparent; border: none; color: var(--text-muted); width: 32px; height: 32px; 
+    border-radius: 6px; cursor: pointer; display: flex; justify-content: center; align-items: center; 
+    transition: 0.2s; margin-right: 4px; font-size: 0.95rem; flex-shrink: 0;
 }
 .action-icon:hover { background: var(--border-color); color: var(--text-main); }
+.btn-remove-cp { color: var(--danger) !important; }
 
-.checkpoint-actions { display: flex; gap: 5px; margin-top: 10px; }
-.checkpoint-actions button {
-    background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); color: var(--text-muted); 
-    font-size: 0.75rem; padding: 6px; border-radius: 4px; cursor: pointer; transition: 0.2s; flex: 1; font-weight: 600;
-}
-.checkpoint-actions button:hover { background: var(--border-color); color: var(--text-main); }
-.btn-remove-cp { color: var(--danger) !important; flex: 0.5 !important; }
+/* --- DYNAMIC UI STATES: EMPTY vs FILLED --- */
+/* By default, hide the Edit button so user can just type freely */
+.btn-edit-address { display: none; }
+
+/* When data is present, show the Edit button */
+.route-node.has-data .btn-edit-address { display: flex; }
+
+/* When data is present, hide the GPS and Map pickers to keep it clean */
+.route-node.has-data .btn-loc,
+.route-node.has-data .btn-map { display: none; }
+
+.add-text-btn { color: var(--accent); font-weight: 600; font-size: 0.9rem; padding: 10px 0; transition: 0.2s; }
+.route-node.add-cp-node:hover .add-text-btn { color: var(--accent-hover); }
 
 /* Buttons & Selects */
 .control-group { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
 .control-group label { font-size: 0.8rem; color: var(--text-muted); font-weight: 600;}
-select { background: var(--input-bg); border: 1px solid var(--border-color); color: var(--text-main); padding: 10px; border-radius: 6px; outline: none; font-size: 0.9rem; }
+select { background: var(--input-bg); border: 1px solid var(--border-color); color: var(--text-main); padding: 10px; border-radius: 6px; outline: none; font-size: 0.9rem; width: 100%; }
 .primary-btn { background: var(--accent); color: white; border: none; padding: 12px; border-radius: 6px; cursor: pointer; font-weight: 600; transition: 0.2s; margin-top: 5px;}
 .primary-btn:hover { background: var(--accent-hover); }
-.btn-text { background: none; border: none; color: var(--accent); cursor: pointer; font-weight: 600; font-size: 0.9rem; transition: color 0.2s; padding: 5px 0; }
-.btn-text:hover { color: var(--accent-hover); }
 
-/* --- GOOGLE PLACES AUTOCOMPLETE FIX --- */
+/* --- GOOGLE PLACES AUTOCOMPLETE DROPDOWN FIXES --- */
 .pac-container {
-    z-index: 10000 !important; background-color: var(--tooltip-bg); border: 1px solid var(--border-color);
+    z-index: 100000 !important; background-color: var(--tooltip-bg); border: 1px solid var(--border-color);
     box-shadow: var(--shadow); border-radius: 0 0 6px 6px; font-family: 'Inter', sans-serif;
 }
 .pac-item { color: var(--text-main); border-top: 1px solid var(--border-color); padding: 8px; cursor: pointer;}

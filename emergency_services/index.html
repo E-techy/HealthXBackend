@@ -79,53 +79,60 @@
                 </div>
             </div>
 
-            <!-- ROUTING & DISPATCH PANEL -->
+           <!-- ROUTING & DISPATCH PANEL -->
             <div id="panel-routing" class="flyout-panel hidden">
                 <h3>Route Dispatch</h3>
                 
-                <div id="route-points-container">
+                <div class="routing-timeline" id="route-points-container">
+                    
                     <!-- Origin -->
-                    <div class="point-row expanded" data-id="origin">
-                        <div class="row-header">
-                            <div class="row-title">Origin</div>
-                            <div class="row-summary">Select location...</div>
-                            <button class="btn-toggle-row">▼</button>
+                    <div class="route-node" data-id="origin">
+                        <div class="node-connector">
+                            <div class="dot origin-dot"></div>
+                            <div class="line"></div>
                         </div>
-                        <div class="row-body">
-                            <div class="input-with-actions">
-                                <input type="text" id="input-origin" placeholder="Search address or Pick..." readonly>
-                                <button class="action-icon btn-edit-address" title="Type Address">✏️</button>
-                                <button class="action-icon btn-loc" title="Use Device GPS">📍</button>
-                                <button class="action-icon btn-map" title="Pick from Map">🎯</button>
+                        <div class="node-content">
+                            <div class="input-wrapper">
+                                <input type="text" id="input-origin" placeholder="Choose starting point..." readonly>
+                                <button class="action-icon btn-edit-address" title="Search">🔍</button>
+                                <button class="action-icon btn-loc" title="GPS">📍</button>
+                                <button class="action-icon btn-map" title="Map">🎯</button>
                             </div>
                         </div>
                     </div>
 
                     <!-- Dynamic Checkpoints Container -->
-                    <div id="checkpoints-list"></div>
+                    <div id="checkpoints-list" class="routing-timeline"></div>
 
-                    <!-- Add Checkpoint Button (Hidden initially) -->
-                    <button id="btn-add-checkpoint" class="btn-text" style="display: none; width:100%; text-align:left; margin: 10px 0;">+ Add Checkpoint</button>
+                    <!-- Add Checkpoint Node -->
+                    <div class="route-node add-cp-node" id="btn-add-checkpoint" style="display: none; cursor: pointer; margin-top: 5px;">
+                        <div class="node-connector">
+                            <div class="dot add-dot">+</div>
+                            <div class="line"></div>
+                        </div>
+                        <div class="node-content">
+                            <div class="add-text-btn">Add destination or checkpoint</div>
+                        </div>
+                    </div>
 
                     <!-- Destination -->
-                    <div class="point-row expanded" data-id="destination">
-                        <div class="row-header">
-                            <div class="row-title">Destination</div>
-                            <div class="row-summary">Select location...</div>
-                            <button class="btn-toggle-row">▼</button>
+                    <div class="route-node" data-id="destination">
+                        <div class="node-connector">
+                            <div class="dot dest-dot"></div>
                         </div>
-                        <div class="row-body">
-                            <div class="input-with-actions">
-                                <input type="text" id="input-destination" placeholder="Search address or Pick..." readonly>
-                                <button class="action-icon btn-edit-address" title="Type Address">✏️</button>
-                                <button class="action-icon btn-loc" title="Use Device GPS">📍</button>
-                                <button class="action-icon btn-map" title="Pick from Map">🎯</button>
+                        <div class="node-content">
+                            <div class="input-wrapper">
+                                <input type="text" id="input-destination" placeholder="Choose destination..." readonly>
+                                <button class="action-icon btn-edit-address" title="Search">🔍</button>
+                                <button class="action-icon btn-loc" title="GPS">📍</button>
+                                <button class="action-icon btn-map" title="Map">🎯</button>
                             </div>
                         </div>
                     </div>
+
                 </div>
                 
-                <hr style="border:0; border-top:1px solid var(--border-color); margin: 15px 0;">
+                <hr style="border:0; border-top:1px solid var(--border-color); margin: 20px 0 15px 0;">
                 
                 <div class="control-group">
                     <select id="route-mode">
