@@ -81,35 +81,51 @@
                 </div>
             </div>
 
+           
             <!-- Routing & Dispatch -->
             <div id="panel-routing" class="flyout-panel hidden">
                 <h3>Route Dispatch</h3>
-                <div class="control-group">
-                    <label>Origin</label>
-                    <div class="input-with-actions">
-                        <input type="text" id="route-origin" placeholder="GPS or Address" readonly>
-                        <button class="action-icon" id="btn-loc-origin" title="Use Current Device Location">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.9 12.1a8 8 0 1 0-15.8 0"></path><line x1="12" y1="2" x2="12" y2="4"></line><line x1="12" y1="20" x2="12" y2="22"></line><line x1="2" y1="12" x2="4" y2="12"></line><line x1="20" y1="12" x2="22" y2="12"></line></svg>
-                        </button>
-                        <button class="action-icon" id="btn-map-origin" title="Pick from Map">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="3"></circle></svg>
-                        </button>
+                
+                <div id="route-points-container" style="display: flex; flex-direction: column; gap: 10px;">
+                    
+                    <!-- Origin -->
+                    <div class="point-row" data-id="origin">
+                        <div class="control-group" style="margin-bottom:0;">
+                            <label>Origin (Start)</label>
+                            <div class="input-with-actions">
+                                <input type="text" id="input-origin" placeholder="Select on map..." readonly>
+                                <button class="action-icon btn-loc" title="Use Device GPS">📍</button>
+                                <button class="action-icon btn-map" title="Pick from Map">🎯</button>
+                            </div>
+                        </div>
                     </div>
+
+                    <!-- Dynamic Checkpoints Container -->
+                    <div id="checkpoints-list" style="display: flex; flex-direction: column; gap: 10px;"></div>
+
+                    <!-- Destination -->
+                    <div class="point-row" data-id="destination">
+                        <div class="control-group" style="margin-bottom:0;">
+                            <label>Destination (End)</label>
+                            <div class="input-with-actions">
+                                <input type="text" id="input-destination" placeholder="Select on map..." readonly>
+                                <button class="action-icon btn-loc" title="Use Device GPS">📍</button>
+                                <button class="action-icon btn-map" title="Pick from Map">🎯</button>
+                            </div>
+                        </div>
+                    </div>
+
                 </div>
+
+                <button id="btn-add-checkpoint" class="btn-text" style="width:100%; text-align:left; margin: 10px 0;">+ Add Checkpoint</button>
                 
                 <div class="control-group">
-                    <label>Destination</label>
-                    <div class="input-with-actions">
-                        <input type="text" id="route-dest" placeholder="GPS or Address" readonly>
-                        <button class="action-icon" id="btn-loc-dest" title="Use Current Device Location">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.9 12.1a8 8 0 1 0-15.8 0"></path><line x1="12" y1="2" x2="12" y2="4"></line><line x1="12" y1="20" x2="12" y2="22"></line><line x1="2" y1="12" x2="4" y2="12"></line><line x1="20" y1="12" x2="22" y2="12"></line></svg>
-                        </button>
-                        <button class="action-icon" id="btn-map-dest" title="Pick from Map">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="3"></circle></svg>
-                        </button>
-                    </div>
+                    <select id="route-mode">
+                        <option value="DRIVE">Police Cruiser (Drive)</option>
+                        <option value="TWO_WHEELER">First Responder (Bike)</option>
+                    </select>
                 </div>
-                <button id="btn-calculate-route" class="primary-btn">Calculate Path</button>
+                <button id="btn-calculate-route" class="primary-btn" style="width:100%">Calculate Path</button>
             </div>
 
             <!-- Tracking -->
