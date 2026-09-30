@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HealthX - Command Center Login</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/emergency/css/auth.css">
+</head>
+<body>
+    <div class="auth-wrapper">
+        <div class="auth-card">
+            
+            <div class="brand-header">
+                <h1 class="brand-title">HealthX Command</h1>
+                <p class="subtitle" id="form-subtitle">Sign in to your account</p>
+            </div>
+
+            <div id="alert-box" class="alert hidden"></div>
+
+            <!-- LOGIN FORM -->
+            <form id="login-form" class="auth-form active">
+                <div class="input-group">
+                    <input type="email" id="login-email" required placeholder=" ">
+                    <label for="login-email">Email or phone</label>
+                </div>
+                <div class="input-group">
+                    <input type="password" id="login-password" required placeholder=" ">
+                    <label for="login-password">Enter your password</label>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="button" class="btn-text" id="link-to-forgot">Forgot password?</button>
+                    <button type="submit" class="btn-primary" id="btn-login">Next</button>
+                </div>
+                <div class="form-footer">
+                    <button type="button" class="btn-text" id="link-to-signup">Create account</button>
+                </div>
+            </form>
+
+            <!-- SIGNUP FORM -->
+            <form id="signup-form" class="auth-form hidden">
+                <div class="input-group">
+                    <input type="text" id="signup-name" required placeholder=" ">
+                    <label for="signup-name">Full Name</label>
+                </div>
+                <div class="input-group">
+                    <input type="email" id="signup-email" required placeholder=" ">
+                    <label for="signup-email">Email address</label>
+                </div>
+                <div class="input-group">
+                    <input type="password" id="signup-password" required placeholder=" ">
+                    <label for="signup-password">Password</label>
+                </div>
+                <div class="input-group file-group">
+                    <label for="signup-image" class="file-label">Profile Image (Optional)</label>
+                    <input type="file" id="signup-image" accept="image/*">
+                </div>
+                
+                <div class="form-actions right-align">
+                    <button type="submit" class="btn-primary" id="btn-signup">Sign Up</button>
+                </div>
+                <div class="form-footer">
+                    <button type="button" class="btn-text" id="link-to-login">Sign in instead</button>
+                </div>
+            </form>
+
+            <!-- OTP VERIFICATION FORM (For Signup) -->
+            <form id="otp-form" class="auth-form hidden">
+                <p class="instruction-text">An email with a verification code was just sent to you.</p>
+                <div class="input-group">
+                    <input type="text" id="otp-code" required placeholder=" " maxlength="6">
+                    <label for="otp-code">Enter 6-digit code</label>
+                </div>
+                <div class="form-actions right-align">
+                    <button type="submit" class="btn-primary" id="btn-verify">Verify</button>
+                </div>
+            </form>
+
+            <!-- FORGOT PASSWORD FORM -->
+            <form id="forgot-form" class="auth-form hidden">
+                <p class="instruction-text">Enter your email and we'll send you a code to reset your password.</p>
+                <div class="input-group">
+                    <input type="email" id="forgot-email" required placeholder=" ">
+                    <label for="forgot-email">Recovery email</label>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn-text" id="link-to-login-from-forgot">Back</button>
+                    <button type="submit" class="btn-primary" id="btn-forgot">Send Code</button>
+                </div>
+            </form>
+
+            <!-- RESET PASSWORD FORM -->
+            <form id="reset-form" class="auth-form hidden">
+                <p class="instruction-text">Enter the code from your email and your new password.</p>
+                <div class="input-group">
+                    <input type="text" id="reset-otp" required placeholder=" " maxlength="6">
+                    <label for="reset-otp">6-digit Code</label>
+                </div>
+                <div class="input-group">
+                    <input type="password" id="reset-new-password" required placeholder=" ">
+                    <label for="reset-new-password">New Password</label>
+                </div>
+                <div class="form-actions right-align">
+                    <button type="submit" class="btn-primary" id="btn-reset">Save Password</button>
+                </div>
+            </form>
+
+        </div>
+    </div>
+    <script src="/emergency/js/core/authUI.js"></script>
+</body>
+</html>
