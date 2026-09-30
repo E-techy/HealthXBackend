@@ -6,7 +6,7 @@
     <title>HealthX Emergency Command Center</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/emergency/css/layout.css">
 </head>
 <body>
@@ -46,7 +46,6 @@
             
             <div class="dock-spacer"></div>
 
-            <!-- Theme & Collapse Controls -->
             <button class="dock-btn action-btn" id="btn-theme-toggle">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
                 <span class="tooltip">Toggle Theme</span>
@@ -60,7 +59,6 @@
         <!-- FLYOUT PANELS CONTAINER -->
         <div id="flyout-container">
             
-            <!-- Map Controls -->
             <div id="panel-map-controls" class="flyout-panel hidden">
                 <h3>Map Configuration</h3>
                 <div class="control-group">
@@ -81,19 +79,22 @@
                 </div>
             </div>
 
-           
-            <!-- Routing & Dispatch -->
+            <!-- ROUTING & DISPATCH PANEL -->
             <div id="panel-routing" class="flyout-panel hidden">
                 <h3>Route Dispatch</h3>
                 
-                <div id="route-points-container" style="display: flex; flex-direction: column; gap: 10px;">
-                    
+                <div id="route-points-container">
                     <!-- Origin -->
-                    <div class="point-row" data-id="origin">
-                        <div class="control-group" style="margin-bottom:0;">
-                            <label>Origin (Start)</label>
+                    <div class="point-row expanded" data-id="origin">
+                        <div class="row-header">
+                            <div class="row-title">Origin</div>
+                            <div class="row-summary">Select location...</div>
+                            <button class="btn-toggle-row">▼</button>
+                        </div>
+                        <div class="row-body">
                             <div class="input-with-actions">
-                                <input type="text" id="input-origin" placeholder="Select on map..." readonly>
+                                <input type="text" id="input-origin" placeholder="Search address or Pick..." readonly>
+                                <button class="action-icon btn-edit-address" title="Type Address">✏️</button>
                                 <button class="action-icon btn-loc" title="Use Device GPS">📍</button>
                                 <button class="action-icon btn-map" title="Pick from Map">🎯</button>
                             </div>
@@ -101,23 +102,30 @@
                     </div>
 
                     <!-- Dynamic Checkpoints Container -->
-                    <div id="checkpoints-list" style="display: flex; flex-direction: column; gap: 10px;"></div>
+                    <div id="checkpoints-list"></div>
+
+                    <!-- Add Checkpoint Button (Hidden initially) -->
+                    <button id="btn-add-checkpoint" class="btn-text" style="display: none; width:100%; text-align:left; margin: 10px 0;">+ Add Checkpoint</button>
 
                     <!-- Destination -->
-                    <div class="point-row" data-id="destination">
-                        <div class="control-group" style="margin-bottom:0;">
-                            <label>Destination (End)</label>
+                    <div class="point-row expanded" data-id="destination">
+                        <div class="row-header">
+                            <div class="row-title">Destination</div>
+                            <div class="row-summary">Select location...</div>
+                            <button class="btn-toggle-row">▼</button>
+                        </div>
+                        <div class="row-body">
                             <div class="input-with-actions">
-                                <input type="text" id="input-destination" placeholder="Select on map..." readonly>
+                                <input type="text" id="input-destination" placeholder="Search address or Pick..." readonly>
+                                <button class="action-icon btn-edit-address" title="Type Address">✏️</button>
                                 <button class="action-icon btn-loc" title="Use Device GPS">📍</button>
                                 <button class="action-icon btn-map" title="Pick from Map">🎯</button>
                             </div>
                         </div>
                     </div>
-
                 </div>
-
-                <button id="btn-add-checkpoint" class="btn-text" style="width:100%; text-align:left; margin: 10px 0;">+ Add Checkpoint</button>
+                
+                <hr style="border:0; border-top:1px solid var(--border-color); margin: 15px 0;">
                 
                 <div class="control-group">
                     <select id="route-mode">
@@ -139,7 +147,6 @@
         </div>
     </div>
 
-    <!-- SCRIPT IMPORTS -->
     <script src="/emergency/js/core/events.js"></script>
     <script src="/emergency/js/core/auth.js"></script>
     <script src="/emergency/js/core/mapLoader.js"></script>
@@ -153,7 +160,6 @@
     <script src="/emergency/js/maps/tileManager.js"></script>
     <script src="/emergency/js/maps/flatMap.js"></script>
     <script src="/emergency/js/maps/sphereMap.js"></script>
-    <script src="/emergency/js/rendering/plotter.js"></script>
     <script src="/emergency/js/maps/markerManager.js"></script>
 </body>
 </html>
