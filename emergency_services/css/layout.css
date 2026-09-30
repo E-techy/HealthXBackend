@@ -75,7 +75,7 @@ body { font-family: 'Inter', sans-serif; overflow: hidden; background: #000; col
     white-space: nowrap; opacity: 0; pointer-events: none;
     box-shadow: var(--shadow); transition: opacity 0.2s, left 0.2s;
 }
-.dock-btn:hover .tooltip { opacity: 1; left: 50px; }
+.dock-btn:not(.active):hover .tooltip { opacity: 1; left: 50px; }
 
 /* FLYOUT PANELS */
 #flyout-container {
@@ -111,3 +111,70 @@ input:focus, select:focus { border-color: var(--accent); }
 /* LISTS */
 #active-tracking-list { list-style: none; }
 .empty-state { font-size: 0.85rem; color: var(--text-muted); font-style: italic; }
+
+/* --- NEW: ROUTING INPUT ACTIONS --- */
+.input-with-actions {
+    display: flex;
+    align-items: center;
+    background: var(--input-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding-right: 5px;
+    transition: all 0.2s;
+}
+.input-with-actions:focus-within { border-color: var(--accent); }
+.input-with-actions input {
+    flex-grow: 1; border: none; background: transparent; 
+    padding: 10px; color: var(--text-main); outline: none;
+}
+.action-icon {
+    background: transparent; border: none; color: var(--text-muted);
+    width: 28px; height: 28px; border-radius: 4px; cursor: pointer;
+    display: flex; justify-content: center; align-items: center; transition: 0.2s;
+}
+.action-icon svg { width: 16px; height: 16px; }
+.action-icon:hover { background: var(--border-color); color: var(--text-main); }
+
+/* --- NEW: TACTICAL MARKERS --- */
+.tactical-marker {
+    position: relative; display: flex; align-items: center; justify-content: center;
+    width: 36px; height: 36px; border-radius: 50%;
+    color: white; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.5);
+    border: 2px solid white; cursor: pointer;
+}
+.tactical-marker.origin { background-color: #10b981; /* Green */ }
+.tactical-marker.destination { background-color: #ef4444; /* Red */ }
+
+/* Sequential Number */
+.tactical-marker .seq-num { position: absolute; top: -5px; left: -5px; background: #000; font-size: 10px; width: 16px; height: 16px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 1px solid white;}
+
+/* Hover Coordinates Tooltip */
+.tactical-marker .coords-tooltip {
+    position: absolute; bottom: 110%; left: 50%; transform: translateX(-50%);
+    background: rgba(0,0,0,0.8); padding: 4px 8px; border-radius: 4px;
+    font-size: 0.75rem; white-space: nowrap; opacity: 0; pointer-events: none; transition: 0.2s;
+}
+.tactical-marker:hover .coords-tooltip { opacity: 1; }
+
+/* Marker Controls (X and Edit) */
+.marker-controls {
+    position: absolute; top: -10px; right: -25px; display: flex; flex-direction: column; gap: 4px;
+    opacity: 0; transition: 0.2s; pointer-events: none;
+}
+.tactical-marker:hover .marker-controls { opacity: 1; pointer-events: auto; }
+.marker-btn {
+    width: 20px; height: 20px; border-radius: 50%; border: none; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; font-size: 10px;
+    background: white; color: black; box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+}
+.marker-btn:hover { background: #e2e8f0; }
+
+/* Edit Panel */
+.marker-edit-panel {
+    position: absolute; left: 120%; top: 0; background: var(--bg-glass);
+    backdrop-filter: blur(10px); padding: 8px; border-radius: 6px;
+    border: 1px solid var(--border-color); display: flex; gap: 5px; display: none;
+}
+.marker-edit-panel.show { display: flex; }
+.icon-option { background: transparent; border: none; font-size: 1.2rem; cursor: pointer; }
+.icon-option:hover { transform: scale(1.2); }

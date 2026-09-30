@@ -4,37 +4,62 @@ class FlatMapController {
         this.map2D = null;
         this.isInitialized = false;
 
-        // Listen to the walkie-talkie
+        // Listen to the EventBus
         if (window.EventBus) {
             window.EventBus.on('switch_to_2d', this.showMap.bind(this));
             window.EventBus.on('switch_to_3d', this.hideMap.bind(this));
             window.EventBus.on('change_tile_layer', this.changeLayer.bind(this));
             window.EventBus.on('update_location', this.updateLocation.bind(this));
+            window.EventBus.on('theme_changed', this.updateTheme.bind(this));
         }
 
         // Initialize immediately because 2D is the default view on load
         this.initMap();
     }
 
-    async initMap(lat = 23.3441, lng = 85.3096) { // Defaulting to Ranchi region
+    // Wrap Geolocation in a Promise to await it cleanly
+    async getUserLocation(defaultLat = 22.9, defaultLng = 78.2) { // Fallback to central India
+        return new Promise((resolve) => {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => resolve({ lat: position.coords.latitude, lng: position.coords.longitude }),
+                    () => resolve({ lat: defaultLat, lng: defaultLng }),
+                    { timeout: 5000 } // Don't hang forever if location is slow
+                );
+            } else {
+                resolve({ lat: defaultLat, lng: defaultLng });
+            }
+        });
+    }
+
+    async initMap() {
         if (this.isInitialized) return;
 
         try {
             // 1. Wait for secure API key load
             await window.mapLoader.loadGoogleMaps();
 
-            // 2. Import standard Maps library
+            // 2. Fetch User's Live Location
+            const coords = await this.getUserLocation();
+
+            // 3. Import standard Maps library
             const { Map } = await google.maps.importLibrary("maps");
 
-            // 3. Create the Map
+            // 4. Create the Map
             this.map2D = new Map(this.container, {
-                center: { lat: lat, lng: lng },
-                zoom: 13,
+                center: coords,
+                zoom: 5, // Significantly zoomed out for a broader overview
+                mapId: "DEMO_MAP_ID", // REQUIRED FOR ADVANCED MARKERS
                 mapTypeId: 'roadmap',
-                styles: window.tileManager.getStyleForLayer('roadmap'), // Apply tactical theme
-                disableDefaultUI: true, // Hides Google's default buttons for a cleaner UI
-                zoomControl: true,      // Keep zoom buttons
-                mapTypeControl: false   // We use our custom UI for this
+                styles: window.tileManager.getStyleForLayer('roadmap'), 
+                disableDefaultUI: true, 
+                zoomControl: true,      
+                mapTypeControl: false   
+            });
+
+            // 5. Setup Click Listener for Marker Placement
+            this.map2D.addListener('click', (e) => {
+                window.EventBus.emit('map_clicked', { lat: e.latLng.lat(), lng: e.latLng.lng() });
             });
 
             this.isInitialized = true;
@@ -55,25 +80,28 @@ class FlatMapController {
         this.container.classList.add('hidden');
     }
 
+    updateTheme() {
+        if (!this.isInitialized || !this.map2D) return;
+        this.map2D.setOptions({
+            styles: window.tileManager.getStyleForLayer(this.map2D.getMapTypeId())
+        });
+    }
+
     changeLayer(data) {
         if (!this.isInitialized || !this.map2D) return;
         
-        const layerType = data.layerType; // 'roadmap', 'satellite', 'terrain', 'hybrid'
-        
-        // Change the base imagery type
+        const layerType = data.layerType;
         this.map2D.setMapTypeId(layerType);
         
-        // Re-apply styles (removes dark mode if satellite, adds it back if roadmap)
-        this.map2D.setOptions({
-            styles: window.tileManager.getStyleForLayer(layerType)
-        });
+        // Ensure theme is properly applied on layer change
+        this.updateTheme();
     }
 
     updateLocation(data) {
         if (!this.isInitialized || !this.map2D) return;
         
-        // Smoothly pan the 2D map to the new emergency coordinates
         this.map2D.panTo({ lat: data.lat, lng: data.lng });
+        this.map2D.setZoom(16); // Zoom in close when a specific emergency location is updated
     }
 }
 

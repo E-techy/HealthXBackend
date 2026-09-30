@@ -8,22 +8,43 @@ class SphereMapController {
             window.EventBus.on('switch_to_3d', this.showMap.bind(this));
             window.EventBus.on('switch_to_2d', this.hideMap.bind(this));
             window.EventBus.on('update_location', this.updateLocation.bind(this));
+            window.EventBus.on('change_tile_layer', this.changeLayer.bind(this));
         }
     }
 
-    async initMap(lat = 23.3441, lng = 85.3096, isRetry = false) {
+    async getUserLocation(defaultLat = 22.9, defaultLng = 78.2) {
+        return new Promise((resolve) => {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => resolve({ lat: position.coords.latitude, lng: position.coords.longitude }),
+                    () => resolve({ lat: defaultLat, lng: defaultLng }),
+                    { timeout: 5000 }
+                );
+            } else {
+                resolve({ lat: defaultLat, lng: defaultLng });
+            }
+        });
+    }
+
+    async initMap(lat = null, lng = null, isRetry = false) {
         if (this.isInitialized) return;
 
         try {
             await window.mapLoader.loadGoogleMaps(isRetry);
 
+            // Fetch live location if specific coordinates weren't passed
+            let centerCoords = { lat, lng };
+            if (lat === null || lng === null) {
+                centerCoords = await this.getUserLocation();
+            }
+
             const { Map3DElement } = await google.maps.importLibrary("maps3d");
 
             this.map3D = new Map3DElement({
-                center: { lat: lat, lng: lng, altitude: 800 }, 
-                tilt: 60,
+                center: { lat: centerCoords.lat, lng: centerCoords.lng, altitude: 2500000 }, // 2,500km up for continent-level view
+                tilt: 0, // Look straight down on load for a map-like feel
                 heading: 0,
-                mode: "HYBRID" // FIXED: Required by the latest Google Maps 3D update
+                mode: "HYBRID" 
             });
 
             this.map3D.style.width = '100%';
@@ -33,6 +54,13 @@ class SphereMapController {
             this.isInitialized = true;
             
             console.log("🌍 3D Sphere Initialized Securely");
+            
+            // Enable 3D Marker Placement Clicks
+            this.map3D.addEventListener('gmp-click', (e) => {
+                if(e.position) {
+                    window.EventBus.emit('map_clicked', { lat: e.position.lat, lng: e.position.lng });
+                }
+            });               
 
         } catch (error) {
             console.error("🔥 Failed to load 3D Map.", error);
@@ -58,16 +86,28 @@ class SphereMapController {
         this.container.classList.add('hidden');
     }
 
+    changeLayer(data) {
+        if (!this.isInitialized || !this.map3D) return;
+        
+        // 3D Maps only support HYBRID and SATELLITE modes
+        if (data.layerType === 'satellite') {
+            this.map3D.mode = "SATELLITE";
+        } else {
+            this.map3D.mode = "HYBRID";
+        }
+    }
+
     updateLocation(data) {
         if (!this.isInitialized || !this.map3D) return;
         
+        // Swoop in closely and tilt to see 3D buildings at the target location
         this.map3D.flyCameraTo({
             endCamera: {
-                center: { lat: data.lat, lng: data.lng, altitude: 400 },
-                tilt: 65,
+                center: { lat: data.lat, lng: data.lng, altitude: 2500 }, // 2.5km altitude
+                tilt: 60, // Heavy tilt to view structures
                 heading: data.heading || this.map3D.heading
             },
-            durationMillis: 2000
+            durationMillis: 3000
         });
     }
 }
