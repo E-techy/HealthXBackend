@@ -1,49 +1,73 @@
 document.addEventListener('DOMContentLoaded', () => {
     
-    // Map hotkeys to their respective panel IDs
-    const panelMap = {
-        'm': document.getElementById('panel-map-controls'),
-        'r': document.getElementById('panel-routing'),
-        't': document.getElementById('panel-tracking')
-    };
+    const dockBtns = document.querySelectorAll('.dock-btn[data-target]');
+    const flyoutPanels = document.querySelectorAll('.flyout-panel');
+    const collapseBtn = document.getElementById('btn-collapse-all');
+    const themeToggleBtn = document.getElementById('btn-theme-toggle');
+    
+    let inactivityTimer = null;
+    let isPanelOpen = false;
 
-    // 1. KEYBOARD SHORTCUTS
-    document.addEventListener('keydown', (e) => {
-        // DO NOT trigger shortcuts if the user is typing inside an input box!
-        if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+    // --- SYSTEM THEME INIT ---
+    const prefersLight = window.matchMedia('(prefers-color-scheme: light)').matches;
+    let currentTheme = localStorage.getItem('healthx_theme') || (prefersLight ? 'light' : 'dark');
+    document.body.setAttribute('data-theme', currentTheme);
 
-        const key = e.key.toLowerCase();
-        
-        if (panelMap[key]) {
-            e.preventDefault(); // Stop default browser behavior
-            togglePanel(panelMap[key]);
-        }
-    });
+    // --- 1. DOCK CLICKS ---
+    dockBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const targetId = btn.getAttribute('data-target');
+            const targetPanel = document.getElementById(targetId);
+            const isCurrentlyActive = btn.classList.contains('active');
 
-    // 2. MOUSE CLICKS
-    document.querySelectorAll('.floating-panel .toggle-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const panel = e.target.closest('.floating-panel');
-            togglePanel(panel);
+            // Close everything first
+            closeAllPanels();
+
+            // If it wasn't active, open it
+            if (!isCurrentlyActive) {
+                btn.classList.add('active');
+                targetPanel.classList.remove('hidden');
+                isPanelOpen = true;
+                resetInactivityTimer();
+            }
         });
     });
 
-    // 3. CORE TOGGLE LOGIC
-    function togglePanel(panel) {
-        if (!panel) return;
-        
-        // Toggle the CSS class
-        panel.classList.toggle('closed');
-        
-        // Update the arrow icon
-        const btn = panel.querySelector('.toggle-btn');
-        const isClosed = panel.classList.contains('closed');
-        
-        // Bottom panel opens UP, side panels open DOWN
-        if (panel.id === 'panel-tracking') {
-            btn.textContent = isClosed ? '▲' : '▼';
-        } else {
-            btn.textContent = isClosed ? '▼' : '▲';
-        }
+    // --- 2. COLLAPSE CONTROLS ---
+    collapseBtn.addEventListener('click', closeAllPanels);
+
+    function closeAllPanels() {
+        dockBtns.forEach(b => b.classList.remove('active'));
+        flyoutPanels.forEach(p => p.classList.add('hidden'));
+        isPanelOpen = false;
+        clearTimeout(inactivityTimer);
     }
+
+    // --- 3. AUTO-COLLAPSE ON INACTIVITY ---
+    // Listen for mouse movement anywhere on the window. 
+    // If a panel is open and the mouse stops moving for 5 seconds, collapse.
+    window.addEventListener('mousemove', () => {
+        if (isPanelOpen) {
+            resetInactivityTimer();
+        }
+    });
+
+    function resetInactivityTimer() {
+        clearTimeout(inactivityTimer);
+        inactivityTimer = setTimeout(() => {
+            closeAllPanels();
+        }, 5000); // 5 seconds of no mouse movement
+    }
+
+    // --- 4. THEME TOGGLE ---
+    themeToggleBtn.addEventListener('click', () => {
+        currentTheme = currentTheme === 'dark' ? 'light' : 'dark';
+        document.body.setAttribute('data-theme', currentTheme);
+        localStorage.setItem('healthx_theme', currentTheme);
+        
+        // Tell the 2D map to update its colors
+        if (window.EventBus) {
+            window.EventBus.emit('theme_changed', currentTheme);
+        }
+    });
 });

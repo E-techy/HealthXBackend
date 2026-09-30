@@ -4,117 +4,122 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HealthX Emergency Command Center</title>
-    <!-- CSS Layout -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/emergency/css/layout.css">
 </head>
 <body>
 
-    <!-- ========================================== -->
-    <!-- LAYER 0: THE MAP CANVASES (Bottom Layer)   -->
-    <!-- ========================================== -->
+    <!-- LAYER 0: MAPS -->
     <div id="map-container">
-        <!-- 2D Map Canvas -->
         <div id="flat-map-view" class="map-layer active"></div>
-        
-        <!-- 3D Earth/Photorealistic Canvas -->
         <div id="sphere-map-view" class="map-layer hidden"></div>
     </div>
 
-    <!-- ========================================== -->
-    <!-- LAYER 10: FLOATING UI PANELS (Top Layer)   -->
-    <!-- ========================================== -->
+    <!-- LAYER 10: UI WRAPPER -->
     <div id="ui-layer" style="display: none;">
         
-        <!-- TOP BAR: Global Status & Auth -->
-        <header id="top-bar" class="floating-panel">
+        <!-- TOP BAR (Minimalist) -->
+        <header id="top-bar">
             <div class="brand">HealthX Command</div>
-            <div id="auth-status" class="status-indicator warning">Checking Auth...</div>
-            <button id="btn-logout" style="background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.85rem;">Logout</button>
+            <div class="top-actions">
+                <div id="auth-status" class="status-indicator">Authenticating...</div>
+                <button id="btn-logout">Logout</button>
+            </div>
         </header>
 
-        <!-- LEFT PANEL: Map Controls (Layers, 2D/3D toggle) -->
-        <aside id="panel-map-controls" class="floating-panel collapsible closed">
-            <div class="panel-header">
-                <h3>Map Settings (Press 'M')</h3>
-                <button class="toggle-btn">▼</button>
-            </div>
-            <div class="panel-content">
-                <div class="panel-content-inner">
-                    <div class="control-group">
-                        <label>View Mode</label>
-                        <select id="view-mode-select">
-                            <option value="2D">2D Flat Map</option>
-                            <option value="3D">3D Photorealistic Earth</option>
-                        </select>
-                    </div>
-                    <div class="control-group">
-                        <label>Base Layer</label>
-                        <select id="tile-layer-select">
-                            <option value="roadmap">Political / Roads</option>
-                            <option value="satellite">Satellite</option>
-                            <option value="terrain">Terrain</option>
-                            <option value="hybrid">Hybrid</option>
-                        </select>
-                    </div>
+        <!-- THE VERTICAL ICON DOCK -->
+        <nav id="side-dock">
+            <button class="dock-btn" data-target="panel-map-controls">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"></polygon><line x1="8" y1="2" x2="8" y2="18"></line><line x1="16" y1="6" x2="16" y2="22"></line></svg>
+                <span class="tooltip">Map Layers</span>
+            </button>
+            <button class="dock-btn" data-target="panel-routing">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                <span class="tooltip">Dispatch Route</span>
+            </button>
+            <button class="dock-btn" data-target="panel-tracking">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path></svg>
+                <span class="tooltip">Live Emergencies</span>
+            </button>
+            
+            <div class="dock-spacer"></div>
+
+            <!-- Theme & Collapse Controls -->
+            <button class="dock-btn action-btn" id="btn-theme-toggle">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+                <span class="tooltip">Toggle Theme</span>
+            </button>
+            <button class="dock-btn action-btn" id="btn-collapse-all">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                <span class="tooltip">Collapse Panels</span>
+            </button>
+        </nav>
+
+        <!-- FLYOUT PANELS CONTAINER -->
+        <div id="flyout-container">
+            
+            <!-- Map Controls -->
+            <div id="panel-map-controls" class="flyout-panel hidden">
+                <h3>Map Configuration</h3>
+                <div class="control-group">
+                    <label>Dimensional View</label>
+                    <select id="view-mode-select">
+                        <option value="2D">2D Tactical Map</option>
+                        <option value="3D">3D Photorealistic Earth</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label>Map Layer</label>
+                    <select id="tile-layer-select">
+                        <option value="roadmap">Political / Roads</option>
+                        <option value="satellite">Satellite (No Labels)</option>
+                        <option value="terrain">Terrain</option>
+                        <option value="hybrid">Hybrid (Satellite + Labels)</option>
+                    </select>
                 </div>
             </div>
-        </aside>
 
-        <!-- RIGHT PANEL: Routing & Dispatch -->
-        <aside id="panel-routing" class="floating-panel collapsible closed">
-            <div class="panel-header">
-                <h3>Route Dispatch (Press 'R')</h3>
-                <button class="toggle-btn">▼</button>
-            </div>
-            <div class="panel-content">
-                <div class="panel-content-inner">
-                    <input type="text" id="route-origin" placeholder="Origin (Lat,Lng or Address)">
-                    <input type="text" id="route-dest" placeholder="Destination (Lat,Lng or Address)">
+            <!-- Routing -->
+            <div id="panel-routing" class="flyout-panel hidden">
+                <h3>Route Dispatch</h3>
+                <div class="control-group">
+                    <input type="text" id="route-origin" placeholder="Origin Address or GPS">
+                    <input type="text" id="route-dest" placeholder="Destination">
                     <select id="route-mode">
                         <option value="DRIVE">Police Cruiser (Drive)</option>
                         <option value="TWO_WHEELER">First Responder (Bike)</option>
                     </select>
-                    <button id="btn-calculate-route">Calculate Path</button>
+                    <button id="btn-calculate-route" class="primary-btn">Calculate Path</button>
                 </div>
             </div>
-        </aside>
 
-        <!-- BOTTOM PANEL: Live GPS Tracking Log -->
-        <footer id="panel-tracking" class="floating-panel collapsible closed">
-            <div class="panel-header">
-                <h3>Live Active Emergencies (Press 'T')</h3>
-                <button class="toggle-btn">▲</button>
+            <!-- Tracking -->
+            <div id="panel-tracking" class="flyout-panel hidden">
+                <h3>Active Emergencies</h3>
+                <ul id="active-tracking-list">
+                    <li class="empty-state">No active tracking sessions.</li>
+                </ul>
             </div>
-            <div class="panel-content">
-                <div class="panel-content-inner">
-                    <ul id="active-tracking-list">
-                        <li class="empty-state">No active tracking sessions.</li>
-                    </ul>
-                </div>
-            </div>
-        </footer>
 
+        </div>
     </div>
 
-   <!-- 1. Core Systems -->
+    <!-- SCRIPT IMPORTS -->
     <script src="/emergency/js/core/events.js"></script>
     <script src="/emergency/js/core/auth.js"></script>
-    <script src="/emergency/js/core/mapLoader.js"></script> <!-- ADDED HERE -->
+    <script src="/emergency/js/core/mapLoader.js"></script>
     
-    <!-- 2. UI Controllers -->
     <script src="/emergency/js/ui/panels.js"></script>
     <script src="/emergency/js/ui/mapControls.js"></script>
 
-    <!-- 3. API Services -->
     <script src="/emergency/js/services/routingApi.js"></script>
     <script src="/emergency/js/services/gpsTracker.js"></script>
 
-    <!-- 4. Map Engines & Renderers -->
     <script src="/emergency/js/maps/tileManager.js"></script>
     <script src="/emergency/js/maps/flatMap.js"></script>
     <script src="/emergency/js/maps/sphereMap.js"></script>
     <script src="/emergency/js/rendering/plotter.js"></script>
-</body>
-</html>
 </body>
 </html>

@@ -3,30 +3,34 @@ document.addEventListener('DOMContentLoaded', () => {
     const viewModeSelect = document.getElementById('view-mode-select');
     const tileLayerSelect = document.getElementById('tile-layer-select');
 
-    // 1. Handle 2D vs 3D switching
+    // Save the original 2D options
+    const options2D = `
+        <option value="roadmap">Political / Roads</option>
+        <option value="satellite">Satellite (No Labels)</option>
+        <option value="terrain">Terrain</option>
+        <option value="hybrid">Hybrid (Satellite + Labels)</option>
+    `;
+
+    // 3D Options supported by Google Map3DElement
+    const options3D = `
+        <option value="hybrid">3D Hybrid (Default)</option>
+        <option value="satellite">3D Satellite (Clean)</option>
+    `;
+
     viewModeSelect.addEventListener('change', (e) => {
         const mode = e.target.value;
         
         if (mode === '3D') {
-            // Tell the system to switch to 3D
+            tileLayerSelect.innerHTML = options3D;
             window.EventBus.emit('switch_to_3d');
-            
-            // Hide the tile selector because 3D Earth has its own integrated textures
-            tileLayerSelect.closest('.control-group').style.display = 'none';
         } else {
-            // Tell the system to switch to 2D
+            tileLayerSelect.innerHTML = options2D;
             window.EventBus.emit('switch_to_2d');
-            
-            // Bring back the tile selector
-            tileLayerSelect.closest('.control-group').style.display = 'flex';
         }
     });
 
-    // 2. Handle 2D Tile Layer switching (Satellite, Terrain, etc.)
     tileLayerSelect.addEventListener('change', (e) => {
         const selectedLayer = e.target.value;
-        
-        // Broadcast the change to whatever map is listening (our flatMap)
         window.EventBus.emit('change_tile_layer', { layerType: selectedLayer });
     });
 });
