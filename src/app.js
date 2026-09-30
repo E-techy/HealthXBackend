@@ -21,6 +21,9 @@ app.use(express.urlencoded({ extended: true }));
 // ADD THIS: Make the "public" folder accessible via HTTP
 app.use('/public', express.static(path.join(__dirname, '../public')));
 
+app.use('/emergency', express.static(path.join(__dirname, '../emergency_services')));
+
+
 
 app.use('/api/auth', authRoutes);
 

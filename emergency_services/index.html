@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HealthX Emergency Command Center</title>
+    <!-- We will link the CSS in the next step -->
+    <link rel="stylesheet" href="/emergency/css/layout.css">
+</head>
+<body>
+
+    <!-- ========================================== -->
+    <!-- LAYER 0: THE MAP CANVASES (Bottom Layer)   -->
+    <!-- ========================================== -->
+    <div id="map-container">
+        <!-- 2D Map Canvas -->
+        <div id="flat-map-view" class="map-layer active"></div>
+        
+        <!-- 3D Earth/Photorealistic Canvas -->
+        <div id="sphere-map-view" class="map-layer hidden"></div>
+    </div>
+
+
+    <!-- ========================================== -->
+    <!-- LAYER 10: FLOATING UI PANELS (Top Layer)   -->
+    <!-- ========================================== -->
+    <div id="ui-layer">
+        
+        <!-- TOP BAR: Global Status & Auth -->
+        <header id="top-bar" class="floating-panel">
+            <div class="brand">HealthX Command</div>
+            <div id="auth-status" class="status-indicator warning">Waiting for Auth...</div>
+        </header>
+
+        <!-- LEFT PANEL: Map Controls (Layers, 2D/3D toggle) -->
+        <aside id="panel-map-controls" class="floating-panel collapsible closed">
+            <div class="panel-header">
+                <h3>Map Settings (Press 'M')</h3>
+                <button class="toggle-btn">▼</button>
+            </div>
+            <div class="panel-content">
+                <div class="control-group">
+                    <label>View Mode</label>
+                    <select id="view-mode-select">
+                        <option value="2D">2D Flat Map</option>
+                        <option value="3D">3D Photorealistic Earth</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label>Base Layer</label>
+                    <select id="tile-layer-select">
+                        <option value="roadmap">Political / Roads</option>
+                        <option value="satellite">Satellite</option>
+                        <option value="terrain">Terrain</option>
+                        <option value="hybrid">Hybrid</option>
+                    </select>
+                </div>
+            </div>
+        </aside>
+
+        <!-- RIGHT PANEL: Routing & Dispatch -->
+        <aside id="panel-routing" class="floating-panel collapsible closed">
+            <div class="panel-header">
+                <h3>Route Dispatch (Press 'R')</h3>
+                <button class="toggle-btn">▼</button>
+            </div>
+            <div class="panel-content">
+                <input type="text" id="route-origin" placeholder="Origin (Lat,Lng or Address)">
+                <input type="text" id="route-dest" placeholder="Destination (Lat,Lng or Address)">
+                <select id="route-mode">
+                    <option value="DRIVE">Police Cruiser (Drive)</option>
+                    <option value="TWO_WHEELER">First Responder (Bike)</option>
+                </select>
+                <button id="btn-calculate-route">Calculate Path</button>
+            </div>
+        </aside>
+
+        <!-- BOTTOM PANEL: Live GPS Tracking Log -->
+        <footer id="panel-tracking" class="floating-panel collapsible closed">
+            <div class="panel-header">
+                <h3>Live Active Emergencies (Press 'T')</h3>
+                <button class="toggle-btn">▲</button>
+            </div>
+            <div class="panel-content">
+                <ul id="active-tracking-list">
+                    <li class="empty-state">No active tracking sessions.</li>
+                </ul>
+            </div>
+        </footer>
+
+    </div>
+
+
+    <!-- ========================================== -->
+    <!-- SCRIPT IMPORTS (Order Matters)             -->
+    <!-- ========================================== -->
+    
+    <!-- 1. Core Systems -->
+    <script src="/emergency/js/core/events.js"></script>
+    <script src="/emergency/js/core/auth.js"></script>
+    
+    <!-- 2. UI Controllers -->
+    <script src="/emergency/js/ui/panels.js"></script>
+    <script src="/emergency/js/ui/mapControls.js"></script>
+
+    <!-- 3. API Services -->
+    <script src="/emergency/js/services/routingApi.js"></script>
+    <script src="/emergency/js/services/gpsTracker.js"></script>
+
+    <!-- 4. Map Engines & Renderers -->
+    <script src="/emergency/js/maps/tileManager.js"></script>
+    <script src="/emergency/js/maps/flatMap.js"></script>
+    <script src="/emergency/js/maps/sphereMap.js"></script>
+    <script src="/emergency/js/rendering/plotter.js"></script>
+
+</body>
+</html>

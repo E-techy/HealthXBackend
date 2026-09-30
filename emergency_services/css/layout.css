@@ -1,0 +1,154 @@
+/* ========================================================
+   BASE RESET & VARIABLES
+   ======================================================== */
+:root {
+    --bg-panel: rgba(15, 23, 42, 0.85); /* Dark translucent blue */
+    --border-color: rgba(255, 255, 255, 0.15);
+    --text-main: #f8fafc;
+    --text-muted: #94a3b8;
+    --accent: #3b82f6;
+    --accent-hover: #60a5fa;
+    --danger: #ef4444;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; overflow: hidden; background: #000; }
+
+/* ========================================================
+   LAYER 0: MAP CANVASES
+   ======================================================== */
+#map-container {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100vw; height: 100vh;
+    z-index: 0;
+}
+
+.map-layer {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+}
+.map-layer.hidden { display: none; }
+
+/* ========================================================
+   LAYER 10: UI WRAPPER
+   ======================================================== */
+#ui-layer {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100vw; height: 100vh;
+    z-index: 10;
+    pointer-events: none; /* Let clicks pass through to the map... */
+}
+
+/* ========================================================
+   FLOATING PANELS (General)
+   ======================================================== */
+.floating-panel {
+    pointer-events: auto; /* ...but catch clicks on the panels themselves */
+    background: var(--bg-panel);
+    backdrop-filter: blur(10px); /* Glassmorphism effect */
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    color: var(--text-main);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
+    display: flex;
+    flex-direction: column;
+}
+
+/* Panel Headers */
+.panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    background: rgba(0, 0, 0, 0.2);
+    border-bottom: 1px solid var(--border-color);
+    border-radius: 8px 8px 0 0;
+}
+
+.panel-header h3 { font-size: 0.9rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+
+/* Toggle Button */
+.toggle-btn {
+    background: none; border: none; color: var(--text-muted);
+    cursor: pointer; font-size: 1rem; padding: 4px;
+    transition: color 0.2s;
+}
+.toggle-btn:hover { color: var(--text-main); }
+
+/* ========================================================
+   SMOOTH COLLAPSE ANIMATION (CSS Grid Hack)
+   ======================================================== */
+.panel-content {
+    display: grid;
+    grid-template-rows: 1fr;
+    transition: grid-template-rows 0.3s ease-out, padding 0.3s ease-out;
+    padding: 16px;
+}
+
+.panel-content-inner {
+    overflow: hidden; /* Crucial for the animation to work */
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+/* When the panel gets the .closed class */
+.floating-panel.closed .panel-content {
+    grid-template-rows: 0fr;
+    padding: 0 16px; /* Remove vertical padding when closed */
+    border-bottom: none;
+}
+
+/* ========================================================
+   SPECIFIC PANEL POSITIONS
+   ======================================================== */
+/* Top Bar */
+#top-bar {
+    position: fixed;
+    top: 0; left: 0; width: 100vw;
+    height: 48px;
+    border-radius: 0; border-top: none; border-left: none; border-right: none;
+    flex-direction: row; justify-content: space-between; align-items: center;
+    padding: 0 20px;
+    z-index: 20;
+}
+#top-bar .brand { font-weight: bold; color: var(--accent); letter-spacing: 1px; }
+.status-indicator.warning { color: var(--danger); font-weight: bold; font-size: 0.85rem;}
+.status-indicator.connected { color: #22c55e; font-weight: bold; font-size: 0.85rem;}
+
+/* Left Panel (Map Controls) */
+#panel-map-controls { position: fixed; top: 64px; left: 16px; width: 300px; z-index: 15; }
+
+/* Right Panel (Routing) */
+#panel-routing { position: fixed; top: 64px; right: 16px; width: 320px; z-index: 15; }
+
+/* Bottom Panel (Tracking List) */
+#panel-tracking {
+    position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
+    width: 600px; z-index: 15;
+}
+
+/* ========================================================
+   FORM ELEMENTS
+   ======================================================== */
+.control-group { display: flex; flex-direction: column; gap: 4px; }
+label { font-size: 0.8rem; color: var(--text-muted); }
+input, select {
+    background: rgba(0,0,0,0.3); border: 1px solid var(--border-color);
+    color: white; padding: 8px; border-radius: 4px; outline: none; font-size: 0.9rem;
+}
+input:focus, select:focus { border-color: var(--accent); }
+button#btn-calculate-route {
+    background: var(--accent); color: white; border: none;
+    padding: 10px; border-radius: 4px; cursor: pointer; font-weight: bold;
+    transition: background 0.2s; margin-top: 8px;
+}
+button#btn-calculate-route:hover { background: var(--accent-hover); }
+
+/* Lists */
+#active-tracking-list { list-style: none; }
+.empty-state { font-size: 0.85rem; color: var(--text-muted); text-align: center; font-style: italic; }
