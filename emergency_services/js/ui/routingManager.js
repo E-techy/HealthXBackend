@@ -1,67 +1,47 @@
 /**
  * RoutingManager
- * 
- * Auto-generates and manages the Routing Panel UI.
- * Handles accordion expanding/collapsing, GPS fetching, Map picking, 
- * and synchronizing data down to the MarkerManager.
+ * Generates the Google-style Routing Timeline UI.
+ * Handles device file uploads for markers and Enter-key submits.
  */
 class RoutingManager {
-    /**
-     * @param {String} containerId - The ID of the div where the panel should be built.
-     */
     constructor(containerId) {
         this.container = document.getElementById(containerId);
-        this.pickingForId = null; // Tracks if user is clicking on the map for a specific node
+        this.pickingForId = null;
         this.checkpointCount = 0;
 
-        if (!this.container) {
-            console.error(`[RoutingManager] Container #${containerId} not found.`);
-            return;
-        }
+        if (!this.container) return;
 
         this.buildInitialUI();
-        this.bindGlobalEvents();
+        this.bindEvents();
 
-        // Initially attempt to attach Places Autocomplete for Origin and Dest
         setTimeout(() => {
             this.attachAutocompleteToNode('origin');
             this.attachAutocompleteToNode('destination');
         }, 500);
     }
 
-    // ==========================================
-    // 1. UI BUILDERS
-    // ==========================================
-    
     buildInitialUI() {
-        this.container.className = 'routing-manager-wrapper';
+        // 🌟 FIX 3: Pure timeline injected straight into the flyout. No absolute wrapping divs.
         this.container.innerHTML = `
-            <div id="routing-manager-panel">
-                <!-- Header -->
-                <div class="rm-header">
-                    <span class="rm-title-text">Route Dispatch</span>
-                    <button class="btn-global-toggle" title="Toggle Panel">◀</button>
-                </div>
+            <div class="rm-timeline" id="rm-timeline">
+                ${this.generateNodeHTML('origin', 'Origin', true)}
                 
-                <!-- Body / Nodes -->
-                <div class="rm-body" id="rm-node-list">
-                    ${this.generateNodeHTML('origin', 'Origin', true)}
-                    
-                    <div id="rm-checkpoints-container"></div>
-                    
-                    <button id="rm-btn-add-cp" class="rm-btn-add-cp" style="display: none;">+ Add Checkpoint</button>
-                    
-                    ${this.generateNodeHTML('destination', 'Destination', false)}
+                <div id="rm-checkpoints-container" style="display:contents;"></div>
+                
+                <!-- Seamless Add Checkpoint Node -->
+                <div class="rm-node add-cp-node" id="rm-btn-add-cp" style="display: none; cursor: pointer;">
+                    <div class="node-connector">
+                        <div class="rm-dot add"></div>
+                        <div class="node-line"></div>
+                    </div>
+                    <div class="node-content">
+                        <span class="add-text-btn">+ Add checkpoint</span>
+                    </div>
                 </div>
 
-                <!-- Footer -->
-                <div class="rm-footer">
-                    <button id="rm-btn-find-route" class="rm-btn-primary" disabled>Calculate Route</button>
-                </div>
+                ${this.generateNodeHTML('destination', 'Destination', false)}
             </div>
         `;
-
-        // Expand Origin by default
         this.expandNode('origin');
     }
 
@@ -73,127 +53,101 @@ class RoutingManager {
 
         return `
             <div class="rm-node collapsed" data-id="${id}">
-                <!-- Collapsed Summary -->
-                <div class="rm-summary">
+                <div class="node-connector">
                     <div class="rm-dot ${typeClass}"></div>
-                    <div class="rm-summary-info">
-                        <span class="rm-node-title">${title}</span>
-                        <span class="rm-node-value" id="summary-${id}">Select location...</span>
-                    </div>
+                    <div class="node-line"></div>
                 </div>
                 
-                <!-- Expanded Content -->
-                <div class="rm-details">
-                    <div class="rm-input-row">
-                        <input type="text" id="input-${id}" placeholder="Search Google Maps..." />
-                        <button class="rm-action-btn btn-map" title="Pick from Map">🎯</button>
-                        <button class="rm-action-btn btn-gps" title="Use My Location">📍</button>
-                        ${clearBtnHTML}
+                <div class="node-content">
+                    <div class="rm-summary">
+                        <div class="rm-summary-info">
+                            <span class="rm-node-title">${title}</span>
+                            <span class="rm-node-value" id="summary-${id}">Select location...</span>
+                        </div>
                     </div>
                     
-                    <div class="rm-adv-form">
-                        <div class="rm-adv-title">Advanced Marker Settings</div>
-                        <input type="text" class="input-label" placeholder="Custom Label Name" />
-                        <input type="text" class="input-icon" placeholder="Custom Icon URL (png, jpg, svg)" />
-                        <textarea class="input-desc" placeholder="Detailed description/notes..."></textarea>
+                    <div class="rm-details">
+                        <div class="rm-input-row">
+                            <input type="text" id="input-${id}" placeholder="Search location..." />
+                            <button class="rm-action-btn btn-map" title="Pick from Map">🎯</button>
+                            <button class="rm-action-btn btn-gps" title="Use My Location">📍</button>
+                            ${clearBtnHTML}
+                        </div>
+                        
+                        <div class="rm-adv-form">
+                            <label class="rm-adv-label">Marker Name
+                                <input type="text" class="input-label" placeholder="Type and press Enter (or tap OK)..." />
+                            </label>
+                            <label class="rm-adv-label">Custom Image
+                                <input type="file" class="input-icon-file" accept="image/png, image/jpeg, image/svg+xml, image/webp" />
+                            </label>
+                            <label class="rm-adv-label">Detailed Notes
+                                <textarea class="input-desc" placeholder="Type and press Enter (or tap OK)..."></textarea>
+                            </label>
+                        </div>
                     </div>
                 </div>
             </div>
         `;
     }
 
-    // ==========================================
-    // 2. EVENT BINDING
-    // ==========================================
-
-    bindGlobalEvents() {
-        const panel = document.getElementById('routing-manager-panel');
-        const body = document.getElementById('rm-node-list');
+    bindEvents() {
         const btnAddCp = document.getElementById('rm-btn-add-cp');
-        const btnFindRoute = document.getElementById('rm-btn-find-route');
-
-        // Global Collapse
-        panel.querySelector('.btn-global-toggle').addEventListener('click', () => {
-            panel.classList.toggle('panel-collapsed');
-        });
-
-        // Add Checkpoint
         btnAddCp.addEventListener('click', () => this.addCheckpoint());
 
-        // Event Delegation for all Nodes
-        body.addEventListener('click', (e) => {
+        // CLICK DELEGATION
+        this.container.addEventListener('click', (e) => {
             const node = e.target.closest('.rm-node');
             if (!node) return;
             const id = node.getAttribute('data-id');
 
-            // 1. Expand Accordion
-            if (e.target.closest('.rm-summary')) {
-                this.expandNode(id);
-            }
-            // 2. Clear Origin/Dest
-            else if (e.target.closest('.btn-clear')) {
-                this.clearNode(id);
-            }
-            // 3. Remove Checkpoint completely
-            else if (e.target.closest('.btn-remove')) {
-                this.removeCheckpoint(id);
-            }
-            // 4. Map Picking
-            else if (e.target.closest('.btn-map')) {
-                this.startMapPicking(id);
-            }
-            // 5. GPS Location
-            else if (e.target.closest('.btn-gps')) {
-                this.fetchDeviceGps(id);
-            }
+            if (e.target.closest('.rm-summary')) this.expandNode(id);
+            else if (e.target.closest('.btn-clear')) this.clearNode(id);
+            else if (e.target.closest('.btn-remove')) this.removeCheckpoint(id);
+            else if (e.target.closest('.btn-map')) this.startMapPicking(id);
+            else if (e.target.closest('.btn-gps')) this.fetchDeviceGps(id);
         });
 
-        // Event Delegation for Advanced Inputs (Auto-sync to MarkerManager on blur/enter)
-        body.addEventListener('change', (e) => {
-            const node = e.target.closest('.rm-node');
-            if (!node) return;
-            const id = node.getAttribute('data-id');
-            const marker = window.markerManager.getMarker(id);
-
-            // If user types here, cancel any pending GPS request to prevent overwrite
-            window.gpsTracker.cancelRequest(id);
-
-            if (!marker) return; // Cant update advanced settings if marker doesn't exist yet
-
-            if (e.target.classList.contains('input-label')) {
-                window.markerManager.setMarkerLabel(id, e.target.value.trim());
-                this.updateNodeSummary(id); // Update summary text to show new label
-            }
-            else if (e.target.classList.contains('input-icon')) {
-                const url = e.target.value.trim();
-                // Validate via MarkerManager
-                if (url && window.markerManager.isValidImageUrl(url)) {
-                    window.markerManager.setMarkerIcon(id, marker.iconName, url);
-                } else if (url) {
-                    alert("Invalid image format. Use JPG, PNG, GIF, SVG, or WEBP.");
-                    e.target.value = '';
+        // FILE UPLOAD (Fires on 'change' when device returns image)
+        this.container.addEventListener('change', (e) => {
+            if (e.target.classList.contains('input-icon-file')) {
+                const id = e.target.closest('.rm-node').getAttribute('data-id');
+                const file = e.target.files[0];
+                if (file && window.markerManager.getMarker(id)) {
+                    const objectUrl = URL.createObjectURL(file);
+                    window.markerManager.setMarkerIcon(id, file.name, objectUrl);
                 }
             }
-            else if (e.target.classList.contains('input-desc')) {
-                window.markerManager.setMarkerDescription(id, e.target.value.trim());
+        });
+
+        // ENTER KEY HANDLER (For Label and Textarea)
+        this.container.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                const id = e.target.closest('.rm-node')?.getAttribute('data-id');
+                if (!id) return;
+
+                if (e.target.classList.contains('input-label')) {
+                    e.preventDefault(); 
+                    window.markerManager.setMarkerLabel(id, e.target.value.trim());
+                    this.updateNodeSummary(id);
+                    e.target.blur(); 
+                } 
+                else if (e.target.classList.contains('input-desc')) {
+                    e.preventDefault();
+                    window.markerManager.setMarkerDescription(id, e.target.value.trim());
+                    e.target.blur();
+                }
             }
         });
 
-        // Listen for Map Clicks (from flatMap.js or sphereMap.js)
         if (window.EventBus) {
             window.EventBus.on('map_clicked', (coords) => this.handleMapClick(coords));
-            
-            // Listen for changes emitted by PlacesAutocomplete or MarkerManager dragging
             window.EventBus.on('marker_location_changed', (data) => this.syncNodeFromMarker(data.id));
         }
     }
 
-    // ==========================================
-    // 3. ACCORDION & UI LOGIC
-    // ==========================================
-
     expandNode(idToExpand) {
-        document.querySelectorAll('.rm-node').forEach(node => {
+        document.querySelectorAll('.rm-node:not(.add-cp-node)').forEach(node => {
             if (node.getAttribute('data-id') === idToExpand) {
                 node.classList.add('expanded');
                 node.classList.remove('collapsed');
@@ -205,53 +159,41 @@ class RoutingManager {
     }
 
     updateNodeSummary(id) {
+        if (!window.markerManager) return;
         const marker = window.markerManager.getMarker(id);
         const summaryEl = document.getElementById(`summary-${id}`);
-        
         if (!summaryEl) return;
 
         if (marker) {
-            // Show "Label - Address" or just Coordinates if no address
             let display = marker.label ? `${marker.label}` : '';
             const locationStr = marker.address || `${marker.lat.toFixed(4)}, ${marker.lng.toFixed(4)}`;
-            
-            if (display) display += ` (${locationStr})`;
-            else display = locationStr;
-
+            display = display ? `${display} (${locationStr})` : locationStr;
             summaryEl.textContent = display;
-            summaryEl.style.color = 'var(--rm-text)';
+            summaryEl.style.color = 'var(--text-main)';
         } else {
             summaryEl.textContent = "Select location...";
-            summaryEl.style.color = 'var(--rm-text-muted)';
+            summaryEl.style.color = 'var(--text-muted)';
         }
-
         this.checkRouteValidity();
     }
 
     checkRouteValidity() {
+        if (!window.markerManager) return;
         const originExists = !!window.markerManager.getMarker('origin');
         const destExists = !!window.markerManager.getMarker('destination');
 
-        // Show/Hide Add Checkpoint button based on Origin
-        document.getElementById('rm-btn-add-cp').style.display = originExists ? 'block' : 'none';
-
-        // Enable/Disable Find Route button
-        const btnRoute = document.getElementById('rm-btn-find-route');
-        if (originExists && destExists) {
-            btnRoute.removeAttribute('disabled');
-        } else {
-            btnRoute.setAttribute('disabled', 'true');
+        document.getElementById('rm-btn-add-cp').style.display = originExists ? 'flex' : 'none';
+        
+        const btnRoute = document.getElementById('btn-calculate-route');
+        if (btnRoute) {
+            if (originExists && destExists) btnRoute.removeAttribute('disabled');
+            else btnRoute.setAttribute('disabled', 'true');
         }
     }
-
-    // ==========================================
-    // 4. MAP PICKING & GPS
-    // ==========================================
 
     startMapPicking(id) {
         this.pickingForId = id;
         document.body.style.cursor = 'crosshair';
-        console.log(`[RoutingManager] Click on the map to set location for ${id}`);
     }
 
     async handleMapClick(coords) {
@@ -259,7 +201,6 @@ class RoutingManager {
         const id = this.pickingForId;
         this.pickingForId = null;
         document.body.style.cursor = 'default';
-
         await this.createOrUpdateMarker(id, coords.lat, coords.lng, null, null);
     }
 
@@ -271,20 +212,16 @@ class RoutingManager {
         } catch (error) {
             if (error.message !== "ABORTED_BY_USER") {
                 alert("Failed to get GPS location. " + error.message);
-                this.updateNodeSummary(id); // Revert summary
+                this.updateNodeSummary(id);
             }
         }
     }
 
-    // ==========================================
-    // 5. DATA SYNC & CRUD
-    // ==========================================
-
     async createOrUpdateMarker(id, lat, lng, placeId = null, address = null) {
+        if (!window.markerManager) return;
         const existingMarker = window.markerManager.getMarker(id);
         const gmpInput = document.getElementById(`input-${id}`);
         
-        // Safety: ensure Places UI knows about this marker
         if (gmpInput) gmpInput.setAttribute('data-marker-id', id);
 
         if (existingMarker) {
@@ -293,39 +230,30 @@ class RoutingManager {
             const isOrigin = id === 'origin';
             const isDest = id === 'destination';
             const label = isOrigin ? "Origin" : (isDest ? "Destination" : `Checkpoint`);
-            
             await window.markerManager.addMarker({
                 id, lat, lng, address, placeId, label, isOrigin, isDestination: isDest
             });
         }
-
         this.syncNodeFromMarker(id);
     }
 
     syncNodeFromMarker(id) {
+        if (!window.markerManager) return;
         const marker = window.markerManager.getMarker(id);
         if (!marker) return;
 
-        // Update Summary
         this.updateNodeSummary(id);
-
-        // Update Advanced Inputs
         const node = document.querySelector(`.rm-node[data-id="${id}"]`);
         if (node) {
             node.querySelector('.input-label').value = marker.label || '';
-            node.querySelector('.input-icon').value = marker.iconUrl === window.markerManager.DEFAULT_ICON_URL ? '' : marker.iconUrl;
             node.querySelector('.input-desc').value = marker.description || '';
         }
     }
 
     async clearNode(id) {
-        // Cancel GPS
         window.gpsTracker.cancelRequest(id);
+        if (window.markerManager) await window.markerManager.deleteMarker(id);
 
-        // Delete from maps & state
-        await window.markerManager.deleteMarker(id);
-
-        // Clear UI Inputs
         const node = document.querySelector(`.rm-node[data-id="${id}"]`);
         if (node) {
             const gmpInput = node.querySelector(`[id="input-${id}"]`);
@@ -334,10 +262,9 @@ class RoutingManager {
                 gmpInput.removeAttribute('data-marker-id');
             }
             node.querySelector('.input-label').value = '';
-            node.querySelector('.input-icon').value = '';
+            node.querySelector('.input-icon-file').value = '';
             node.querySelector('.input-desc').value = '';
         }
-
         this.updateNodeSummary(id);
     }
 
@@ -346,8 +273,8 @@ class RoutingManager {
         const id = `cp_${this.checkpointCount}`;
         const container = document.getElementById('rm-checkpoints-container');
         
+        // 🌟 FIX: Inserts dynamically before the destination
         container.insertAdjacentHTML('beforeend', this.generateNodeHTML(id, `Checkpoint ${this.checkpointCount}`, false));
-        
         this.attachAutocompleteToNode(id);
         this.expandNode(id);
     }
@@ -356,7 +283,6 @@ class RoutingManager {
         await this.clearNode(id);
         document.querySelector(`.rm-node[data-id="${id}"]`)?.remove();
         
-        // Update labels for remaining checkpoints visually
         let seq = 1;
         document.querySelectorAll('#rm-checkpoints-container .rm-node').forEach(node => {
             const nodeTitle = node.querySelector('.rm-node-title');
@@ -373,8 +299,6 @@ class RoutingManager {
     }
 }
 
-// Instantiate and bind to a generic div in your index.html
 document.addEventListener('DOMContentLoaded', () => {
-    // Requires <div id="routing-ui-container"></div> in your HTML
     window.routingManager = new RoutingManager('routing-ui-container');
 });

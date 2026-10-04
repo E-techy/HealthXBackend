@@ -1,48 +1,19 @@
 /**
  * MarkerManager
- * 
  * A robust, state-driven manager for Google Maps Advanced Markers.
- * Maintains detailed metadata for every marker including sequence numbering,
- * origin/destination flags, place IDs, and custom icon assets.
- * 
- * Data Structure per Marker:
- * {
- *    id: String (Unique identifier)
- *    label: String (Display name or title)
- *    iconName: String (Name of the icon)
- *    iconUrl: String (URL for the image/icon)
- *    lat: Number (Latitude)
- *    lng: Number (Longitude)
- *    address: String|null (Address from Places API)
- *    description: String (Inner details/notes)
- *    sequence: Number (Position order, mainly for checkpoints)
- *    isOrigin: Boolean (Is this the starting point?)
- *    isDestination: Boolean (Is this the ending point?)
- *    placeId: String|null (Google Place ID)
- *    gMarker: AdvancedMarkerElement (The actual Google Maps map instance)
- * }
  */
 class MarkerManager {
     constructor() {
-        // Map to store all active markers using their ID as the key
         this.markers = new Map();
-        
-        // Google Maps classes (lazy loaded)
         this.AdvancedMarkerElement = null;
         this.PinElement = null;
-
-        // Default icon settings
+        
+        // 🌟 FIX 1: Proper default Google-style red pin SVG
+        this.DEFAULT_ICON_URL = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23ea4335'%3E%3Cpath d='M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z'/%3E%3C/svg%3E";
         this.DEFAULT_ICON_NAME = "default_pin";
-        this.DEFAULT_ICON_URL = "https://maps.gstatic.com/mapfiles/transparent.png"; // Fallback transparent/default
-
-        // Allowed browser-supported image formats
         this.ALLOWED_IMAGE_FORMATS = /\.(jpeg|jpg|gif|png|svg|webp)$/i;
     }
 
-    /**
-     * Initializes required Google Maps libraries asynchronously.
-     * Prevents UI blocking during initialization.
-     */
     async initGoogleLibraries() {
         try {
             if (!this.AdvancedMarkerElement) {
@@ -55,39 +26,13 @@ class MarkerManager {
         }
     }
 
-    /**
-     * Validates if the provided URL is a browser-supported image format.
-     * @param {string} url - The image URL to test.
-     * @returns {boolean} - True if valid, false otherwise.
-     */
     isValidImageUrl(url) {
         if (!url) return false;
-        // Allow base64 encoded images or standard file extensions
-        if (url.startsWith('data:image/')) return true;
-        
-        // Strip query parameters for extension checking
+        if (url.startsWith('data:image/') || url.startsWith('blob:')) return true;
         const urlWithoutQuery = url.split('?')[0]; 
         return this.ALLOWED_IMAGE_FORMATS.test(urlWithoutQuery);
     }
 
-    /**
-     * Creates and adds a new marker to the map and state.
-     * 
-     * @param {Object} data - The marker configuration data.
-     * @param {String} data.id - REQUIRED: Unique identifier.
-     * @param {Number} data.lat - REQUIRED: Latitude.
-     * @param {Number} data.lng - REQUIRED: Longitude.
-     * @param {String} [data.label=""] - Display label.
-     * @param {String} [data.iconName] - Name of the icon.
-     * @param {String} [data.iconUrl] - URL of the icon.
-     * @param {String} [data.address=null] - Formatted address.
-     * @param {String} [data.description=""] - Detailed notes.
-     * @param {Boolean} [data.isOrigin=false] - Flag for origin point.
-     * @param {Boolean} [data.isDestination=false] - Flag for destination point.
-     * @param {String} [data.placeId=null] - Google Maps Place ID.
-     * 
-     * @returns {Object|null} - The created marker data object or null if failed.
-     */
     async addMarker(data) {
         try {
             if (!data.id || data.lat === undefined || data.lng === undefined) {
@@ -96,33 +41,49 @@ class MarkerManager {
 
             await this.initGoogleLibraries();
 
-            // Handle Icon Validation
             let finalIconUrl = this.DEFAULT_ICON_URL;
             if (data.iconUrl && this.isValidImageUrl(data.iconUrl)) {
                 finalIconUrl = data.iconUrl;
-            } else if (data.iconUrl) {
-                console.warn(`⚠️ [MarkerManager] Invalid image format for marker ${data.id}. Using default.`);
             }
 
-            // Create the HTML Element for the AdvancedMarker
-            // (You can customize this DOM structure based on your CSS UI needs)
+            // 🌟 FIX 2: Rich HTML structure for Click-to-Expand functionality
             const markerContent = document.createElement('div');
-            markerContent.className = 'custom-map-marker';
+            markerContent.className = 'custom-map-marker collapsed';
             markerContent.innerHTML = `
-                <img src="${finalIconUrl}" alt="${data.iconName || this.DEFAULT_ICON_NAME}" class="marker-icon"/>
-                <div class="marker-label">${data.label || ''}</div>
+                <div class="marker-pin-wrapper">
+                    <img src="${finalIconUrl}" alt="${data.iconName || this.DEFAULT_ICON_NAME}" class="marker-icon"/>
+                </div>
+                <div class="marker-popup">
+                    <div class="marker-popup-label">${data.label || 'Location'}</div>
+                    <div class="marker-popup-address">${data.address || `${data.lat.toFixed(4)},${data.lng.toFixed(4)}`}</div>
+                    <div class="marker-popup-desc" style="${data.description ? 'display:block;' : 'display:none;'}">${data.description || ''}</div>
+                </div>
             `;
 
-            // Initialize the Google Maps Advanced Marker
+            // Click listener to toggle the big image and popup
+            markerContent.addEventListener('click', (e) => {
+                e.stopPropagation();
+                // Close all other markers first
+                document.querySelectorAll('.custom-map-marker').forEach(el => el.classList.remove('expanded'));
+                // Toggle this one
+                markerContent.classList.add('expanded');
+            });
+
+            // Click anywhere else on the map to shrink it back
+            if (window.flatMapEngine && window.flatMapEngine.map2D) {
+                window.flatMapEngine.map2D.addListener('click', () => {
+                    document.querySelectorAll('.custom-map-marker').forEach(el => el.classList.remove('expanded'));
+                });
+            }
+
             const gMarker = new this.AdvancedMarkerElement({
-                map: window.flatMapEngine ? window.flatMapEngine.map2D : null, // Fallback safely if map engine isn't ready
+                map: window.flatMapEngine ? window.flatMapEngine.map2D : null,
                 position: { lat: data.lat, lng: data.lng },
                 content: markerContent,
                 title: data.label || data.id,
-                gmpDraggable: true // Allow dragging by default
+                gmpDraggable: true
             });
 
-            // Construct the final State Object
             const markerState = {
                 id: data.id,
                 label: data.label || "",
@@ -132,238 +93,112 @@ class MarkerManager {
                 lng: data.lng,
                 address: data.address || null,
                 description: data.description || "",
-                sequence: 0, // Will be calculated below
-                isOrigin: !!data.isOrigin, // Force boolean
-                isDestination: !!data.isDestination, // Force boolean
+                sequence: 0,
+                isOrigin: !!data.isOrigin,
+                isDestination: !!data.isDestination,
                 placeId: data.placeId || null,
                 gMarker: gMarker
             };
 
-            // Bind Drag Event to handle GPS changes explicitly
             gMarker.addEventListener('gmp-dragend', async () => {
                 const newLat = gMarker.position.lat;
                 const newLng = gMarker.position.lng;
-                
-                // When dragged, old address and placeId are no longer valid. Set them to null.
                 await this.setMarkerLocationAndPlace(data.id, newLat, newLng, null, null);
             });
 
-            // Store in our Map dictionary
             this.markers.set(data.id, markerState);
-
-            // Re-calculate sequences for checkpoints
             await this.updateSequence();
 
             return markerState;
-
         } catch (error) {
             console.error(`❌ [MarkerManager] Error creating marker ${data?.id}:`, error);
             return null;
         }
     }
 
-    /**
-     * Updates the text label of a specific marker.
-     * 
-     * @param {String} id - The ID of the marker.
-     * @param {String} newLabel - The new label text.
-     */
     async setMarkerLabel(id, newLabel) {
         try {
             const marker = this.markers.get(id);
-            if (!marker) throw new Error(`Marker ${id} not found.`);
-
+            if (!marker) return;
             marker.label = newLabel;
-            
-            // Update DOM element directly
-            const labelEl = marker.gMarker.content.querySelector('.marker-label');
-            if (labelEl) labelEl.textContent = newLabel;
-            
-            // Update native tooltip
+            const labelEl = marker.gMarker.content.querySelector('.marker-popup-label');
+            if (labelEl) labelEl.textContent = newLabel || 'Location';
             marker.gMarker.title = newLabel;
-
-        } catch (error) {
-            console.error(`❌ [MarkerManager] Error setting label for ${id}:`, error);
-        }
+        } catch (error) {}
     }
 
-    /**
-     * Updates the icon image of a specific marker.
-     * 
-     * @param {String} id - The ID of the marker.
-     * @param {String} iconName - The name of the icon.
-     * @param {String} iconUrl - The URL of the valid image format.
-     */
     async setMarkerIcon(id, iconName, iconUrl) {
         try {
             const marker = this.markers.get(id);
-            if (!marker) throw new Error(`Marker ${id} not found.`);
-
-            if (!this.isValidImageUrl(iconUrl)) {
-                throw new Error("Invalid image format. Must be a browser-supported image (png, jpg, svg, etc.)");
-            }
-
+            if (!marker) return;
             marker.iconName = iconName;
             marker.iconUrl = iconUrl;
-
-            // Update DOM element directly
             const imgEl = marker.gMarker.content.querySelector('.marker-icon');
             if (imgEl) {
                 imgEl.src = iconUrl;
                 imgEl.alt = iconName;
             }
-        } catch (error) {
-            console.error(`❌ [MarkerManager] Error setting icon for ${id}:`, error);
-        }
+        } catch (error) {}
     }
 
-    /**
-     * Updates the GPS coordinates, Place ID, and Address simultaneously.
-     * Because a new location represents a new place, they must update together.
-     * 
-     * @param {String} id - The ID of the marker.
-     * @param {Number} lat - New Latitude.
-     * @param {Number} lng - New Longitude.
-     * @param {String|null} [placeId=null] - New Google Place ID (null if dragged/unknown).
-     * @param {String|null} [address=null] - New formatted address (null if dragged/unknown).
-     */
     async setMarkerLocationAndPlace(id, lat, lng, placeId = null, address = null) {
         try {
             const marker = this.markers.get(id);
-            if (!marker) throw new Error(`Marker ${id} not found.`);
-
-            // Update State
+            if (!marker) return;
             marker.lat = lat;
             marker.lng = lng;
             marker.placeId = placeId;
             marker.address = address;
-
-            // Update Map Instance Position
             marker.gMarker.position = { lat, lng };
 
-            // Emit an event so other UI components (like the address bar) can react to the cleared address
+            // Update the HTML popup address dynamically
+            const addressEl = marker.gMarker.content.querySelector('.marker-popup-address');
+            if (addressEl) addressEl.textContent = address || `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+
             if (window.EventBus) {
-                window.EventBus.emit('marker_location_changed', {
-                    id: marker.id,
-                    lat: marker.lat,
-                    lng: marker.lng,
-                    placeId: marker.placeId,
-                    address: marker.address
-                });
+                window.EventBus.emit('marker_location_changed', { id, lat, lng, placeId, address });
             }
-            
-        } catch (error) {
-            console.error(`❌ [MarkerManager] Error setting location for ${id}:`, error);
-        }
+        } catch (error) {}
     }
 
-    /**
-     * Updates the internal detailed description of a marker.
-     * 
-     * @param {String} id - The ID of the marker.
-     * @param {String} description - The detailed notes.
-     */
     async setMarkerDescription(id, description) {
         try {
             const marker = this.markers.get(id);
-            if (!marker) throw new Error(`Marker ${id} not found.`);
-
+            if (!marker) return;
             marker.description = description;
-        } catch (error) {
-            console.error(`❌ [MarkerManager] Error setting description for ${id}:`, error);
-        }
+            const descEl = marker.gMarker.content.querySelector('.marker-popup-desc');
+            if (descEl) {
+                descEl.textContent = description;
+                descEl.style.display = description.trim() ? 'block' : 'none';
+            }
+        } catch (error) {}
     }
 
-    /**
-     * Deletes a marker from the map, removes its state, 
-     * and automatically triggers a sequence recalculation.
-     * 
-     * @param {String} id - The ID of the marker to delete.
-     */
     async deleteMarker(id) {
         try {
             const marker = this.markers.get(id);
-            if (!marker) return; // Silent fail if already gone
-
-            // Remove from Google Maps UI
-            if (marker.gMarker) {
-                marker.gMarker.map = null;
-            }
-
-            // Remove from internal state Dictionary
+            if (!marker) return;
+            if (marker.gMarker) marker.gMarker.map = null;
             this.markers.delete(id);
-
-            // Recalculate numbering for remaining checkpoints
             await this.updateSequence();
-
-        } catch (error) {
-            console.error(`❌ [MarkerManager] Error deleting marker ${id}:`, error);
-        }
+        } catch (error) {}
     }
 
-    /**
-     * Recalculates the sequence numbering for all markers.
-     * Ignores Origins and Destinations. Only increments for standard checkpoints.
-     * This is called automatically on add and delete.
-     */
     async updateSequence() {
-        try {
-            let currentSequence = 1;
-
-            for (let [id, marker] of this.markers.entries()) {
-                // Skip Origin and Destination from sequential numbering
-                if (marker.isOrigin || marker.isDestination) {
-                    marker.sequence = 0;
-                    continue;
-                }
-
-                // Assign sequence and increment
-                marker.sequence = currentSequence;
-                
-                // Optionally update a DOM bubble inside the marker to show the number visually
-                const seqBubble = marker.gMarker.content.querySelector('.seq-num-bubble');
-                if (seqBubble) {
-                    seqBubble.textContent = currentSequence;
-                }
-
-                currentSequence++;
+        let currentSequence = 1;
+        for (let [id, marker] of this.markers.entries()) {
+            if (marker.isOrigin || marker.isDestination) {
+                marker.sequence = 0;
+                continue;
             }
-        } catch (error) {
-            console.error(`❌ [MarkerManager] Error updating sequences:`, error);
+            marker.sequence = currentSequence;
+            currentSequence++;
         }
     }
 
-    /**
-     * Retrieves a marker's full data object by ID.
-     * @param {String} id 
-     * @returns {Object|null}
-     */
     getMarker(id) {
         return this.markers.get(id) || null;
     }
-
-    /**
-     * Returns an array of all active marker data objects.
-     * Useful for sending data to the routing engine.
-     * @returns {Array<Object>}
-     */
-    getAllMarkers() {
-        return Array.from(this.markers.values());
-    }
-
-    /**
-     * Wipes all markers from the map and state.
-     */
-    async clearAllMarkers() {
-        try {
-            for (let id of this.markers.keys()) {
-                await this.deleteMarker(id);
-            }
-        } catch (error) {
-            console.error(`❌ [MarkerManager] Error clearing all markers:`, error);
-        }
-    }
 }
 
-// Ensure the class can be instantiated safely in the window scope
-window.MarkerManager = MarkerManager;
+window.markerManager = new MarkerManager();
