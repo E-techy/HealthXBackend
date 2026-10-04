@@ -180,3 +180,59 @@
     background: var(--bg-base); color: var(--text-main); border: 1px solid var(--border-panel);
     padding: 4px 8px; border-radius: 4px; margin-right: 10px; cursor: pointer; font-size: 10px; font-weight: 600;
 }
+
+
+/* ==============================================================
+   ALWAYS-VISIBLE MARKER LABELS & BADGES
+   ============================================================== */
+
+/* The top badge indicating ORIGIN, DEST, or CP 1 */
+.marker-role-badge {
+    position: absolute;
+    top: -14px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--bg-panel, #fff);
+    color: var(--text-main, #000);
+    font-size: 9px;
+    font-weight: 800;
+    padding: 3px 6px;
+    border-radius: 4px;
+    border: 1px solid var(--border-panel, #cbd5e1);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    white-space: nowrap;
+    z-index: 5;
+    letter-spacing: 0.5px;
+}
+
+/* Colorize the role badges */
+.marker-role-badge.origin { color: var(--success, #10b981); border-color: var(--success, #10b981); }
+.marker-role-badge.dest { color: var(--danger, #ef4444); border-color: var(--danger, #ef4444); }
+.marker-role-badge.cp { color: var(--accent, #3b82f6); border-color: var(--accent, #3b82f6); }
+
+/* The bottom permanent label showing Priority Name */
+.marker-permanent-label {
+    position: absolute;
+    bottom: -18px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.75);
+    color: #ffffff;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 6px;
+    white-space: nowrap;
+    max-width: 140px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    z-index: 5;
+    pointer-events: none;
+    backdrop-filter: blur(4px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+}
+
+/* Hide the permanent bottom label ONLY when the big expanded popup is visible */
+.custom-map-marker.expanded .marker-permanent-label {
+    display: none;
+}

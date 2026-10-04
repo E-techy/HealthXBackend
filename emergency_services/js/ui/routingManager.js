@@ -146,17 +146,26 @@ class RoutingManager {
         }
     }
 
-    expandNode(idToExpand) {
+        expandNode(idToExpand) {
         document.querySelectorAll('.rm-node:not(.add-cp-node)').forEach(node => {
             if (node.getAttribute('data-id') === idToExpand) {
                 node.classList.add('expanded');
                 node.classList.remove('collapsed');
+                
+                // 🌟 NEW: Auto-pan map to this marker when accordion opens
+                if (window.markerManager && window.EventBus) {
+                    const marker = window.markerManager.getMarker(idToExpand);
+                    if (marker && marker.lat && marker.lng) {
+                        window.EventBus.emit('update_location', { lat: marker.lat, lng: marker.lng });
+                    }
+                }
             } else {
                 node.classList.remove('expanded');
                 node.classList.add('collapsed');
             }
         });
     }
+
 
     updateNodeSummary(id) {
         if (!window.markerManager) return;

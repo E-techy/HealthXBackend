@@ -7,8 +7,6 @@ class MarkerManager {
         this.markers = new Map();
         this.AdvancedMarkerElement = null;
         this.PinElement = null;
-        
-        // 🌟 FIX 1: Proper default Google-style red pin SVG
         this.DEFAULT_ICON_URL = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23ea4335'%3E%3Cpath d='M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z'/%3E%3C/svg%3E";
         this.DEFAULT_ICON_NAME = "default_pin";
         this.ALLOWED_IMAGE_FORMATS = /\.(jpeg|jpg|gif|png|svg|webp)$/i;
@@ -46,30 +44,29 @@ class MarkerManager {
                 finalIconUrl = data.iconUrl;
             }
 
-            // 🌟 FIX 2: Rich HTML structure for Click-to-Expand functionality
             const markerContent = document.createElement('div');
             markerContent.className = 'custom-map-marker collapsed';
+            
+            // 🌟 ADDED: Role Badge and Permanent Label containers
             markerContent.innerHTML = `
+                <div class="marker-role-badge"></div>
                 <div class="marker-pin-wrapper">
                     <img src="${finalIconUrl}" alt="${data.iconName || this.DEFAULT_ICON_NAME}" class="marker-icon"/>
                 </div>
+                <div class="marker-permanent-label"></div>
                 <div class="marker-popup">
-                    <div class="marker-popup-label">${data.label || 'Location'}</div>
-                    <div class="marker-popup-address">${data.address || `${data.lat.toFixed(4)},${data.lng.toFixed(4)}`}</div>
-                    <div class="marker-popup-desc" style="${data.description ? 'display:block;' : 'display:none;'}">${data.description || ''}</div>
+                    <div class="marker-popup-label"></div>
+                    <div class="marker-popup-address"></div>
+                    <div class="marker-popup-desc"></div>
                 </div>
             `;
 
-            // Click listener to toggle the big image and popup
             markerContent.addEventListener('click', (e) => {
                 e.stopPropagation();
-                // Close all other markers first
                 document.querySelectorAll('.custom-map-marker').forEach(el => el.classList.remove('expanded'));
-                // Toggle this one
                 markerContent.classList.add('expanded');
             });
 
-            // Click anywhere else on the map to shrink it back
             if (window.flatMapEngine && window.flatMapEngine.map2D) {
                 window.flatMapEngine.map2D.addListener('click', () => {
                     document.querySelectorAll('.custom-map-marker').forEach(el => el.classList.remove('expanded'));
@@ -107,7 +104,7 @@ class MarkerManager {
             });
 
             this.markers.set(data.id, markerState);
-            await this.updateSequence();
+            await this.updateSequence(); // This will auto-call updateMarkerVisuals
 
             return markerState;
         } catch (error) {
@@ -116,72 +113,96 @@ class MarkerManager {
         }
     }
 
+    // 🌟 NEW: Master visual updater that handles priority labeling
+    updateMarkerVisuals(id) {
+        const marker = this.markers.get(id);
+        if (!marker || !marker.gMarker) return;
+        const el = marker.gMarker.content;
+
+        // 1. Setup Role Badge (Origin, Dest, or CP #)
+        let roleText = "";
+        let roleClass = "";
+        if (marker.isOrigin) { roleText = "ORIGIN"; roleClass = "origin"; }
+        else if (marker.isDestination) { roleText = "DEST"; roleClass = "dest"; }
+        else { roleText = `CP ${marker.sequence}`; roleClass = "cp"; }
+
+        const badgeEl = el.querySelector('.marker-role-badge');
+        if (badgeEl) {
+            badgeEl.textContent = roleText;
+            badgeEl.className = `marker-role-badge ${roleClass}`;
+        }
+
+        // 2. Setup Priority Label (Custom Name > Display Name > GPS)
+        let primaryText = "";
+        if (marker.label && marker.label.trim() !== '') {
+            primaryText = marker.label;
+        } else if (marker.address && marker.address.trim() !== '') {
+            primaryText = marker.address.split(',')[0]; // Grab just the first line/name of address
+        } else {
+            primaryText = `${marker.lat.toFixed(4)}, ${marker.lng.toFixed(4)}`;
+        }
+
+        const permLabelEl = el.querySelector('.marker-permanent-label');
+        if (permLabelEl) permLabelEl.textContent = primaryText;
+
+        // 3. Update the Expanded Popup content
+        const popLabel = el.querySelector('.marker-popup-label');
+        if (popLabel) popLabel.textContent = marker.label || 'Location';
+
+        const popAddress = el.querySelector('.marker-popup-address');
+        if (popAddress) popAddress.textContent = marker.address || `${marker.lat.toFixed(4)}, ${marker.lng.toFixed(4)}`;
+
+        const popDesc = el.querySelector('.marker-popup-desc');
+        if (popDesc) {
+            popDesc.textContent = marker.description || '';
+            popDesc.style.display = marker.description ? 'block' : 'none';
+        }
+    }
+
     async setMarkerLabel(id, newLabel) {
-        try {
-            const marker = this.markers.get(id);
-            if (!marker) return;
-            marker.label = newLabel;
-            const labelEl = marker.gMarker.content.querySelector('.marker-popup-label');
-            if (labelEl) labelEl.textContent = newLabel || 'Location';
-            marker.gMarker.title = newLabel;
-        } catch (error) {}
+        const marker = this.markers.get(id);
+        if (!marker) return;
+        marker.label = newLabel;
+        marker.gMarker.title = newLabel;
+        this.updateMarkerVisuals(id);
     }
 
     async setMarkerIcon(id, iconName, iconUrl) {
-        try {
-            const marker = this.markers.get(id);
-            if (!marker) return;
-            marker.iconName = iconName;
-            marker.iconUrl = iconUrl;
-            const imgEl = marker.gMarker.content.querySelector('.marker-icon');
-            if (imgEl) {
-                imgEl.src = iconUrl;
-                imgEl.alt = iconName;
-            }
-        } catch (error) {}
+        const marker = this.markers.get(id);
+        if (!marker) return;
+        marker.iconName = iconName;
+        marker.iconUrl = iconUrl;
+        const imgEl = marker.gMarker.content.querySelector('.marker-icon');
+        if (imgEl) { imgEl.src = iconUrl; imgEl.alt = iconName; }
     }
 
     async setMarkerLocationAndPlace(id, lat, lng, placeId = null, address = null) {
-        try {
-            const marker = this.markers.get(id);
-            if (!marker) return;
-            marker.lat = lat;
-            marker.lng = lng;
-            marker.placeId = placeId;
-            marker.address = address;
-            marker.gMarker.position = { lat, lng };
+        const marker = this.markers.get(id);
+        if (!marker) return;
+        marker.lat = lat;
+        marker.lng = lng;
+        marker.placeId = placeId;
+        marker.address = address;
+        marker.gMarker.position = { lat, lng };
+        
+        this.updateMarkerVisuals(id);
 
-            // Update the HTML popup address dynamically
-            const addressEl = marker.gMarker.content.querySelector('.marker-popup-address');
-            if (addressEl) addressEl.textContent = address || `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
-
-            if (window.EventBus) {
-                window.EventBus.emit('marker_location_changed', { id, lat, lng, placeId, address });
-            }
-        } catch (error) {}
+        if (window.EventBus) window.EventBus.emit('marker_location_changed', { id, lat, lng, placeId, address });
     }
 
     async setMarkerDescription(id, description) {
-        try {
-            const marker = this.markers.get(id);
-            if (!marker) return;
-            marker.description = description;
-            const descEl = marker.gMarker.content.querySelector('.marker-popup-desc');
-            if (descEl) {
-                descEl.textContent = description;
-                descEl.style.display = description.trim() ? 'block' : 'none';
-            }
-        } catch (error) {}
+        const marker = this.markers.get(id);
+        if (!marker) return;
+        marker.description = description;
+        this.updateMarkerVisuals(id);
     }
 
     async deleteMarker(id) {
-        try {
-            const marker = this.markers.get(id);
-            if (!marker) return;
-            if (marker.gMarker) marker.gMarker.map = null;
-            this.markers.delete(id);
-            await this.updateSequence();
-        } catch (error) {}
+        const marker = this.markers.get(id);
+        if (!marker) return;
+        if (marker.gMarker) marker.gMarker.map = null;
+        this.markers.delete(id);
+        await this.updateSequence();
     }
 
     async updateSequence() {
@@ -189,10 +210,11 @@ class MarkerManager {
         for (let [id, marker] of this.markers.entries()) {
             if (marker.isOrigin || marker.isDestination) {
                 marker.sequence = 0;
-                continue;
+            } else {
+                marker.sequence = currentSequence;
+                currentSequence++;
             }
-            marker.sequence = currentSequence;
-            currentSequence++;
+            this.updateMarkerVisuals(id); // Force visual update when sequence changes
         }
     }
 
