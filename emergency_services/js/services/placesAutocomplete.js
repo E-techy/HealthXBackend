@@ -1,279 +1,176 @@
+/**
+ * PlacesAutocompleteService
+ * 
+ * Upgraded to use the Google Maps Places API (New) Web Components.
+ * This service directly interfaces with the MarkerManager.
+ * 
+ * Logic Flow:
+ * 1. Attaches <gmp-place-autocomplete> to the DOM.
+ * 2. On Selection: Fetches coordinates, address, and placeId.
+ * 3. Checks for `data-marker-id` on the element.
+ *    -> If missing: Creates a new marker via MarkerManager & saves the ID.
+ *    -> If present: Updates the existing marker's location, address, and label.
+ * 4. On Clear: If the input is emptied, it reads the ID and deletes the marker.
+ */
 class PlacesAutocompleteService {
     constructor() {
-        this.instances = new Map();
-        this.theme = document.documentElement.dataset.theme || 'dark';
-
-        window.EventBus?.on('theme_changed', theme => {
-            this.theme = theme || 'dark';
-            this.instances.forEach(x => this.applyTheme(x.el));
-        });
+        this.PlaceAutocompleteElement = null;
+        this.instances = new Map(); // Store active UI instances to prevent duplicate bindings
     }
 
-    async loadPlacesLibrary() {
-        if (!window.google?.maps) throw Error('Google Maps is not loaded');
-        if (!google.maps.places) await google.maps.importLibrary('places');
-    }
-
-    applyTheme(el) {
-        if (!el) return;
-
-        const light = this.theme === 'light';
-        el.style.colorScheme = light ? 'light' : 'dark';
-
-        [
-            ['--gmp-mat-color-surface', light ? '#fff' : '#0f172a'],
-            ['--gmp-mat-color-surface-container', light ? '#f8fafc' : '#111827'],
-            ['--gmp-mat-color-on-surface', light ? '#0f172a' : '#f8fafc'],
-            ['--gmp-mat-color-on-surface-variant', light ? '#475569' : '#cbd5e1'],
-            ['--gmp-mat-color-outline', light ? '#cbd5e1' : '#334155'],
-            ['--gmp-mat-color-primary', light ? '#2563eb' : '#60a5fa']
-        ].forEach(([k, v]) => el.style.setProperty(k, v));
-    }
-
-    value(el) {
-        try {
-            return String(el?.value || '').trim();
-        } catch {
-            return '';
+    /**
+     * Initializes the new Places library asynchronously.
+     */
+    async initLibrary() {
+        if (!this.PlaceAutocompleteElement) {
+            try {
+                const { PlaceAutocompleteElement } = await google.maps.importLibrary("places");
+                this.PlaceAutocompleteElement = PlaceAutocompleteElement;
+                console.log("🏙️ [PlacesService] Google Places API (New) Loaded.");
+            } catch (error) {
+                console.error("❌ [PlacesService] Failed to load Google Places API:", error);
+            }
         }
     }
 
-    snapshot(input) {
-        return {
-            id: input.id,
-            placeholder: input.placeholder || '',
-            aria: input.getAttribute('aria-label') || '',
-            value: input.value || ''
-        };
-    }
+    /**
+     * Transforms a standard text input into a Google Places Autocomplete component,
+     * and binds the automated marker creation/updating logic.
+     * 
+     * @param {HTMLElement} inputElement - The base HTML input element to replace.
+     * @returns {HTMLElement|null} - The newly created Web Component.
+     */
+    async attachToInput(inputElement) {
+        if (!inputElement || !inputElement.id) return null;
 
-    destroy(id) {
-        const r = this.instances.get(id);
-        if (!r) return;
+        await this.initLibrary();
+        if (!this.PlaceAutocompleteElement) return null;
 
-        r.dead = true;
-        clearInterval(r.poll);
-        r.mo?.disconnect();
-        r.el?.remove();
+        const id = inputElement.id;
+        
+        // Derive the logical point type (e.g., 'origin', 'destination', 'cp_1') from the input ID
+        const pointType = id.replace('input-', ''); 
 
-        this.instances.delete(id);
-    }
+        // Prevent attaching multiple times to the same element
+        if (this.instances.has(id)) {
+            return this.instances.get(id);
+        }
 
-    async geocodeText(text) {
-        const query = String(text || '').trim();
-        if (!query) return null;
+        // 1. Create the New API Web Component
+        const autocompleteEl = new this.PlaceAutocompleteElement();
+        autocompleteEl.id = id;
+        autocompleteEl.className = inputElement.className;
+        
+        // Port the placeholder text over
+        if (inputElement.placeholder) {
+            autocompleteEl.setAttribute('placeholder', inputElement.placeholder);
+        }
 
-        await this.loadPlacesLibrary();
+        // 2. Replace the old input in the DOM
+        inputElement.replaceWith(autocompleteEl);
+        this.instances.set(id, autocompleteEl);
 
-        const response = await new google.maps.Geocoder().geocode({
-            address: query
-        });
-
-        const result = response.results?.[0];
-
-        if (!result?.geometry?.location) return null;
-
-        return {
-            lat: result.geometry.location.lat(),
-            lng: result.geometry.location.lng(),
-            displayName: result.formatted_address,
-            formattedAddress: result.formatted_address
-        };
-    }
-
-    async attachToInput(input, onSelect, onClear) {
-        if (!input?.id) return input;
-
-        await this.loadPlacesLibrary();
-
-        const id = input.id;
-        const snap = this.snapshot(input);
-
-        this.destroy(id);
-
-        const el = new google.maps.places.PlaceAutocompleteElement({});
-
-        el.id = id;
-        el.placeholder = snap.placeholder;
-        el.setAttribute('aria-label', snap.aria || 'Search address');
-        el.setAttribute('data-healthx-autocomplete', 'true');
-
-        this.applyTheme(el);
-
-        const record = {
-            el,
-            snap,
-            last: snap.value.trim(),
-            clear: false,
-            dead: false,
-            busy: false,
-            poll: null,
-            mo: null
-        };
-
-        const sample = () => {
-            if (record.dead) return;
-
-            const value = this.value(el);
-
-            if (record.last && !value && !record.clear) {
-                record.clear = true;
-                record.last = '';
-
-                onClear?.(id);
-
-                setTimeout(() => {
-                    if (!record.dead && this.instances.get(id) === record) {
-                        this.recreateInput(id, {
-                            clear: true,
-                            focus: true
-                        });
-                    }
-                }, 0);
-            }
-
-            if (value) record.clear = false;
-            record.last = value;
-        };
-
-        el.addEventListener('input', sample);
-        el.addEventListener('change', sample);
-
-        el.addEventListener('click', () => {
-            [0, 60, 180].forEach(ms => setTimeout(sample, ms));
-        });
-
-        el.addEventListener('keydown', async e => {
-            if (e.key !== 'Enter' || record.busy) return;
-
-            const value = this.value(el);
-            if (!value) return;
-
-            record.busy = true;
-
-            e.preventDefault();
-            e.stopPropagation();
+        // ==========================================
+        // 3. EVENT: USER SELECTS A PLACE FROM DROPDOWN
+        // ==========================================
+        autocompleteEl.addEventListener('gmp-select', async (event) => {
+            const prediction = event.placePrediction;
+            if (!prediction) return;
 
             try {
-                const data = await this.geocodeText(value);
-
-                if (data) {
-                    record.last = data.formattedAddress;
-                    onSelect?.(data);
-                }
-            } catch (error) {
-                console.warn('Address lookup failed:', error);
-            } finally {
-                record.busy = false;
-            }
-        }, true);
-
-        el.addEventListener('gmp-select', async event => {
-            try {
-                const prediction = event.placePrediction;
-                if (!prediction) return;
-
+                // Convert prediction to a Place object
                 const place = prediction.toPlace();
-
+                
+                // 💰 Fetch only the data we strictly need (Saves API costs)
                 await place.fetchFields({
-                    fields: [
-                        'displayName',
-                        'formattedAddress',
-                        'location'
-                    ]
+                    fields: ['id', 'displayName', 'formattedAddress', 'location']
                 });
 
                 if (!place.location) return;
 
-                const data = {
-                    lat: place.location.lat(),
-                    lng: place.location.lng(),
-                    displayName: place.displayName || place.formattedAddress,
-                    formattedAddress: place.formattedAddress ||
-                        place.displayName ||
-                        this.value(el)
-                };
+                // Extract cleaned data
+                const lat = place.location.lat();
+                const lng = place.location.lng();
+                const address = place.formattedAddress || place.displayName;
+                const placeId = place.id;
+                const name = place.displayName || "Selected Location";
 
-                record.last = data.formattedAddress;
-                record.clear = false;
+                // Check if this UI element already has an attached Marker ID
+                let markerId = autocompleteEl.getAttribute('data-marker-id');
 
-                onSelect?.(data);
+                if (!markerId) {
+                    // --- SCENARIO A: NO MARKER EXISTS ---
+                    // Use the pointType (e.g. 'origin') as the unique marker ID
+                    markerId = pointType; 
+                    
+                    // Create it using the MarkerManager
+                    await window.markerManager.addMarker({
+                        id: markerId,
+                        lat: lat,
+                        lng: lng,
+                        label: name,
+                        address: address,
+                        placeId: placeId,
+                        isOrigin: markerId === 'origin',
+                        isDestination: markerId === 'destination'
+                    });
+
+                    // Tag the UI element so we know a marker exists for it now
+                    autocompleteEl.setAttribute('data-marker-id', markerId);
+                    
+                } else {
+                    // --- SCENARIO B: MARKER ALREADY EXISTS ---
+                    // Update GPS, Address, and Place ID simultaneously
+                    await window.markerManager.setMarkerLocationAndPlace(markerId, lat, lng, placeId, address);
+                    
+                    // Update the visual label
+                    await window.markerManager.setMarkerLabel(markerId, name);
+                }
+
+                // Pan the map camera to the new location (listened to by 2D/3D map engines)
+                if (window.EventBus) {
+                    window.EventBus.emit('update_location', { lat, lng });
+                }
 
             } catch (error) {
-                console.warn('Places selection failed:', error);
+                console.error("❌ [PlacesService] Error processing place selection:", error);
             }
         });
 
-        record.mo = new MutationObserver(sample);
-
-        record.mo.observe(el, {
-            attributes: true,
-            childList: true,
-            subtree: true,
-            characterData: true
+        // ==========================================
+        // 4. EVENT: USER CLEARS THE INPUT BOX
+        // ==========================================
+        autocompleteEl.addEventListener('input', async (e) => {
+            // If the text is completely deleted
+            if (e.target.value === '') {
+                
+                const markerId = autocompleteEl.getAttribute('data-marker-id');
+                
+                if (markerId) {
+                    // Tell MarkerManager to delete the marker and recalculate sequences
+                    await window.markerManager.deleteMarker(markerId);
+                    
+                    // Remove the tracking attribute so a fresh marker will be created next time
+                    autocompleteEl.removeAttribute('data-marker-id');
+                }
+            }
         });
 
-        record.poll = setInterval(sample, 250);
-
-        this.instances.set(id, record);
-
-        input.replaceWith(el);
-
-        return el;
+        return autocompleteEl;
     }
 
-    async recreateInput(id, options = {}) {
-        const record = this.instances.get(id);
-        const old = record?.el || document.getElementById(id);
-
-        const snap = record?.snap || this.snapshot(
-            old || Object.assign(document.createElement('input'), { id })
-        );
-
-        const parent = old?.parentNode;
-        if (!parent) return null;
-
-        this.destroy(id);
-
-        const input = document.createElement('input');
-
-        input.type = 'text';
-        input.id = id;
-        input.placeholder = snap.placeholder || 'Search address...';
-        input.value = options.clear ? '' : snap.value || '';
-
-        if (snap.aria) {
-            input.setAttribute('aria-label', snap.aria);
+    /**
+     * Completely destroys an instance (useful if UI rows are deleted dynamically)
+     * @param {String} id - The ID of the input wrapper (e.g. 'input-cp_1')
+     */
+    destroy(id) {
+        if (this.instances.has(id)) {
+            const el = this.instances.get(id);
+            el.remove();
+            this.instances.delete(id);
         }
-
-        parent.replaceChild(input, old);
-
-        const pointId = id.replace(/^input-/, '');
-
-        const el = await this.attachToInput(
-            input,
-            data => window.markerManager?.selected(pointId, data),
-            () => window.markerManager?.clear(pointId, false)
-        );
-
-        if (options.focus) {
-            setTimeout(() => el?.focus(), 80);
-        }
-
-        return el;
-    }
-
-    getInstance(id) {
-        return this.instances.get(id)?.el || null;
-    }
-
-    hasInstance(id) {
-        return this.instances.has(id);
-    }
-
-    destroyAll() {
-        [...this.instances.keys()].forEach(id => this.destroy(id));
     }
 }
 
+// Ensure globally accessible for the rest of the application
 window.placesAutocompleteService = new PlacesAutocompleteService();
