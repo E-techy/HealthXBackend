@@ -196,19 +196,34 @@ class RoutingManager {
         document.body.style.cursor = 'crosshair';
     }
 
-    async handleMapClick(coords) {
+       async handleMapClick(coords) {
         if (!this.pickingForId) return;
         const id = this.pickingForId;
         this.pickingForId = null;
         document.body.style.cursor = 'default';
+        
         await this.createOrUpdateMarker(id, coords.lat, coords.lng, null, null);
+        
+        // 🌟 ADD THIS HERE TOO: Pan to the clicked location
+        if (window.EventBus) {
+            window.EventBus.emit('update_location', { lat: coords.lat, lng: coords.lng });
+        }
     }
 
-    async fetchDeviceGps(id) {
+
+        async fetchDeviceGps(id) {
         try {
             document.getElementById(`summary-${id}`).textContent = "Fetching GPS...";
             const coords = await window.gpsTracker.getCurrentLocation(id);
+            
+            // 1. Update the marker
             await this.createOrUpdateMarker(id, coords.lat, coords.lng, null, "Current GPS Location");
+            
+            // 2. 🌟 ADD THIS: Tell the 2D/3D map to fly to this new GPS location
+            if (window.EventBus) {
+                window.EventBus.emit('update_location', { lat: coords.lat, lng: coords.lng });
+            }
+            
         } catch (error) {
             if (error.message !== "ABORTED_BY_USER") {
                 alert("Failed to get GPS location. " + error.message);
@@ -216,6 +231,7 @@ class RoutingManager {
             }
         }
     }
+
 
     async createOrUpdateMarker(id, lat, lng, placeId = null, address = null) {
         if (!window.markerManager) return;
