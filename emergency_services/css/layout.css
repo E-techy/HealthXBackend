@@ -1,227 +1,336 @@
 :root {
-    --bg-glass: rgba(15, 23, 42, 0.7);
-    --border-color: rgba(255, 255, 255, 0.15);
+    color-scheme: dark;
+    --bg-glass: rgba(15,23,42,.72);
+    --glass-border: rgba(255,255,255,.14);
+    --glass-highlight: inset 0 1px 0 rgba(255,255,255,.08);
     --text-main: #f8fafc;
     --text-muted: #94a3b8;
+    --text-placeholder: #64748b;
     --accent: #3b82f6;
     --accent-hover: #60a5fa;
-    --input-bg: rgba(0, 0, 0, 0.4);
-    --shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
-    --tooltip-bg: #1e293b;
+    --accent-glow: rgba(59,130,246,.35);
     --danger: #ef4444;
+    --success: #10b981;
+    --input-bg: rgba(2,6,23,.22);
+    --input-border: rgba(148,163,184,.22);
+    --tooltip-bg: rgba(15,23,42,.96);
+    --shadow-soft: 0 12px 38px rgba(0,0,0,.28);
+    --shadow-hard: 0 6px 18px rgba(0,0,0,.4);
+    --route-line: rgba(96,165,250,.72);
 }
 
 [data-theme="light"] {
-    --bg-glass: rgba(255, 255, 255, 0.85);
-    --border-color: rgba(0, 0, 0, 0.1);
+    color-scheme: light;
+    --bg-glass: rgba(255,255,255,.86);
+    --glass-border: rgba(15,23,42,.11);
+    --glass-highlight: inset 0 1px 0 rgba(255,255,255,.9);
     --text-main: #0f172a;
     --text-muted: #475569;
+    --text-placeholder: #94a3b8;
     --accent: #2563eb;
     --accent-hover: #1d4ed8;
-    --input-bg: rgba(255, 255, 255, 0.9);
-    --shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
-    --tooltip-bg: #e2e8f0;
+    --accent-glow: rgba(37,99,235,.22);
+    --danger: #dc2626;
+    --success: #059669;
+    --input-bg: rgba(255,255,255,.58);
+    --input-border: rgba(15,23,42,.12);
+    --tooltip-bg: rgba(255,255,255,.98);
+    --shadow-soft: 0 12px 38px rgba(15,23,42,.13);
+    --shadow-hard: 0 6px 18px rgba(15,23,42,.16);
+    --route-line: rgba(37,99,235,.62);
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: 'Inter', sans-serif; overflow: hidden; background: #000; color: var(--text-main); transition: color 0.3s;}
+html, body { width: 100%; height: 100%; }
+body { font-family: Inter, sans-serif; font-size: 13px; overflow: hidden; color: var(--text-main); background: #000; }
+button, input, select { font: inherit; }
+button { -webkit-tap-highlight-color: transparent; }
 
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 4px; }
-
-/* MAPS & UI FRAMEWORK */
-#map-container { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 0; }
-.map-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+#map-container { position: absolute; inset: 0; z-index: 0; }
+.map-layer { position: absolute; inset: 0; width: 100%; height: 100%; }
 .map-layer.hidden { display: none; }
-#ui-layer { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 10; pointer-events: none; }
 
-#top-bar {
-    position: absolute; top: 15px; left: 15px; right: 15px; height: 50px;
-    background: var(--bg-glass); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-    border: 1px solid var(--border-color); border-radius: 8px; display: flex; justify-content: space-between; 
-    align-items: center; padding: 0 20px; pointer-events: auto; box-shadow: var(--shadow); transition: all 0.3s;
-}
-.brand { font-weight: 700; color: var(--accent); letter-spacing: 0.5px; font-size: 1.1rem; }
-.top-actions { display: flex; align-items: center; gap: 15px; }
-.status-indicator { font-size: 0.85rem; font-weight: 600; color: #10b981; }
-#btn-logout { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.85rem; font-weight: 600;}
-
-#side-dock {
-    position: absolute; top: 80px; left: 15px; bottom: 15px; width: 56px;
-    background: var(--bg-glass); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-    border: 1px solid var(--border-color); border-radius: 8px; display: flex; flex-direction: column; 
-    align-items: center; padding: 15px 0; gap: 10px; pointer-events: auto; box-shadow: var(--shadow);
-}
-.dock-spacer { flex-grow: 1; }
-.dock-btn {
-    position: relative; width: 40px; height: 40px; border-radius: 8px; background: transparent; border: none; 
-    color: var(--text-muted); cursor: pointer; display: flex; justify-content: center; align-items: center; transition: all 0.2s;
-}
-.dock-btn svg { width: 20px; height: 20px; }
-.dock-btn:hover, .dock-btn.active { background: var(--accent); color: white; }
-
-.tooltip {
-    position: absolute; left: 55px; top: 50%; transform: translateY(-50%); background: var(--tooltip-bg); 
-    color: var(--text-main); padding: 6px 12px; border-radius: 4px; font-size: 0.8rem; font-weight: 600;
-    white-space: nowrap; opacity: 0; pointer-events: none; box-shadow: var(--shadow); transition: opacity 0.2s, left 0.2s; z-index: 100;
-}
-.dock-btn:not(.active):hover .tooltip { opacity: 1; left: 50px; }
-
-#flyout-container { position: absolute; top: 80px; left: 85px; pointer-events: auto; bottom: 15px; }
-
-/* FIX 1: Removed overflow-y: auto to ensure the dropdown popup is never clipped */
-.flyout-panel {
-    background: var(--bg-glass); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
-    border: 1px solid var(--border-color); border-radius: 8px; padding: 20px; width: 360px; max-height: 100%; 
-    overflow: visible; box-shadow: var(--shadow); transition: all 0.3s; position: absolute; top: 0; left: 0;
-    opacity: 1; transform: translateX(0); visibility: visible; display: flex; flex-direction: column;
-}
-.flyout-panel.hidden { opacity: 0; transform: translateX(-20px); visibility: hidden; pointer-events: none; }
-.flyout-panel h3 { font-size: 1.1rem; margin-bottom: 15px; font-weight: 700; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;}
-
-/* --- GOOGLE MAPS STYLE ROUTING TIMELINE --- */
-.routing-timeline { display: flex; flex-direction: column; width: 100%; position: relative; }
-
-/* 🌟 Z-INDEX STACKING FIX: Active node floats above others so autocomplete dropdown never clips 🌟 */
-.route-node { 
-    display: flex; align-items: stretch; margin-bottom: 6px; 
-    position: relative; z-index: 1; transition: z-index 0.2s;
-    overflow: visible !important;
-}
-.route-node:focus-within { z-index: 99999; } 
-
-/* Left Timeline Connectors */
-.node-connector { width: 28px; display: flex; flex-direction: column; align-items: center; position: relative; margin-right: 6px; }
-.dot { 
-    width: 14px; height: 14px; border-radius: 50%; border: 3px solid var(--bg-glass); 
-    box-shadow: 0 0 0 1.5px var(--text-muted); background: transparent; margin-top: 15px; z-index: 2;
-}
-.origin-dot { box-shadow: 0 0 0 2px #10b981; background: #10b981; }
-.dest-dot { box-shadow: 0 0 0 2px #ef4444; background: #ef4444; }
-.cp-dot { box-shadow: 0 0 0 2px #3b82f6; background: #3b82f6; }
-.add-dot { display: flex; align-items: center; justify-content: center; font-size: 14px; border: none; box-shadow: none; color: var(--text-muted); font-weight: bold; margin-top: 12px;}
-
-.line { flex-grow: 1; width: 2px; background: var(--border-color); margin-top: 4px; margin-bottom: -15px; }
-.route-node:last-child .line { display: none; }
-
-/* FIX 2: Ensure content wrappers allow overflow */
-.node-content { flex-grow: 1; display: flex; flex-direction: column; justify-content: center; overflow: visible !important; }
-
-/* Google-like Input Wrappers with High Legibility */
-.input-wrapper {
-    display: flex; align-items: center; background: var(--input-bg);
-    border: 1px solid var(--border-color); border-radius: 8px;
-    transition: border-color 0.2s, box-shadow 0.2s; width: 100%;
-    overflow: visible !important;
-}
-.input-wrapper:focus-within {
-    border-color: var(--accent); box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25); background: rgba(59, 130, 246, 0.04);
+#ui-layer { position: absolute; inset: 0; z-index: 10; pointer-events: none; }
+.glass-panel {
+    background: var(--bg-glass);
+    backdrop-filter: blur(18px) saturate(140%);
+    -webkit-backdrop-filter: blur(18px) saturate(140%);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glass-highlight), var(--shadow-soft);
 }
 
-/* FIX 3: Removed text-overflow and overflow:hidden which clipped the internal dropdowns */
-.input-wrapper input,
-.input-wrapper gmp-place-autocomplete {
-    flex-grow: 1; border: none; background: transparent;
-    color: var(--text-main); font-size: 14px; font-weight: 500; 
-    padding: 12px 14px; outline: none; width: 100%; 
+#top-bar { position: absolute; top: 18px; left: 18px; right: 18px; height: 46px; border-radius: 12px; display: flex; align-items: center; justify-content: space-between; padding: 0 18px; pointer-events: auto; }
+.brand { color: var(--accent); font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; }
+.top-actions { display: flex; align-items: center; gap: 18px; }
+.status-indicator { color: var(--success); font-size: 11px; font-weight: 700; text-transform: uppercase; }
+#btn-logout { border: 0; background: transparent; color: var(--text-muted); cursor: pointer; text-transform: uppercase; font-size: 11px; font-weight: 700; }
+#btn-logout:hover { color: var(--danger); }
+
+#side-dock { position: absolute; top: 82px; left: 18px; bottom: 18px; width: 52px; border-radius: 12px; display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 12px 0; pointer-events: auto; }
+.dock-spacer { flex: 1; }
+.dock-btn { position: relative; width: 36px; height: 36px; border: 0; border-radius: 9px; background: transparent; color: var(--text-muted); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: .2s ease; }
+.dock-btn svg { width: 18px; height: 18px; }
+.dock-btn:hover { color: var(--text-main); background: rgba(127,127,127,.12); transform: translateY(-1px); }
+.dock-btn.active { background: var(--accent); color: #fff; box-shadow: 0 6px 18px var(--accent-glow); }
+.tooltip { position: absolute; left: 48px; top: 50%; transform: translate(-8px,-50%); opacity: 0; pointer-events: none; white-space: nowrap; padding: 7px 10px; border: 1px solid var(--glass-border); border-radius: 7px; background: var(--tooltip-bg); color: var(--text-main); box-shadow: var(--shadow-hard); font-size: 11px; font-weight: 600; transition: .18s ease; z-index: 1000; }
+.dock-btn:hover .tooltip { opacity: 1; transform: translate(0,-50%); }
+
+#flyout-container { position: absolute; top: 82px; left: 82px; bottom: 18px; width: 410px; pointer-events: auto; }
+.flyout-panel { position: absolute; inset: 0 auto auto 0; width: 410px; max-height: 100%; border-radius: 14px; padding: 18px; overflow-y: auto; overflow-x: visible; pointer-events: auto; display: flex; flex-direction: column; transition: opacity .22s ease, transform .22s ease, visibility .22s ease; }
+.flyout-panel.hidden { opacity: 0; visibility: hidden; pointer-events: none; transform: translateX(-12px) scale(.98); }
+.flyout-panel h3 { font-size: 13px; letter-spacing: .8px; text-transform: uppercase; color: var(--text-muted); padding-bottom: 11px; border-bottom: 1px solid var(--glass-border); }
+.panel-heading-row { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 13px; }
+.panel-heading-row h3 { border: 0; padding: 0; margin: 0; }
+.panel-subtitle { color: var(--text-placeholder); font-size: 10px; }
+
+/* ---------------- Routing ---------------- */
+.routing-timeline { position: relative; display: flex; flex-direction: column; gap: 7px; width: 100%; }
+#route-points-container { padding: 3px 0 4px; }
+#route-points-container::before {
+    content: ""; position: absolute; z-index: 0; left: 11px; top: 14px; bottom: 17px; width: 4px;
+    border-radius: 999px; background: var(--route-line); box-shadow: 0 0 12px var(--accent-glow), 0 0 2px var(--route-line);
+}
+.route-node { position: relative; z-index: 2; display: flex; align-items: flex-start; width: 100%; min-width: 0; }
+.node-connector { position: relative; width: 24px; flex: 0 0 24px; display: flex; flex-direction: column; align-items: center; margin-right: 10px; z-index: 3; }
+.dot { width: 12px; height: 12px; flex: 0 0 12px; margin-top: 11px; border-radius: 50%; border: 2px solid var(--bg-glass); box-shadow: 0 0 0 2px var(--text-muted), 0 0 10px rgba(0,0,0,.18); z-index: 3; }
+.origin-dot { background: var(--success); box-shadow: 0 0 0 2px var(--success), 0 0 12px rgba(16,185,129,.45); }
+.dest-dot { background: var(--danger); box-shadow: 0 0 0 2px var(--danger), 0 0 12px rgba(239,68,68,.4); }
+.cp-dot { background: var(--accent); box-shadow: 0 0 0 2px var(--accent), 0 0 10px var(--accent-glow); }
+.add-dot { border: 0; box-shadow: none; color: var(--text-muted); display: flex; align-items: center; justify-content: center; }
+.add-dot svg { width: 15px; height: 15px; }
+.line { display: none !important; }
+.node-content { flex: 1; min-width: 0; position: relative; }
+#checkpoints-list { gap: 7px; }
+#checkpoints-list::before { content: ""; position: absolute; left: 11px; top: 0; bottom: 0; width: 4px; background: var(--route-line); border-radius: 999px; box-shadow: 0 0 10px var(--accent-glow); z-index: 0; }
+
+.input-wrapper { min-width: 0; width: 100%; display: flex; align-items: center; gap: 3px; padding: 6px 5px 6px 10px; border: 1px solid var(--input-border); border-radius: 9px; background: var(--input-bg); transition: border-color .18s ease, box-shadow .18s ease; }
+.input-wrapper:focus-within { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-glow); }
+.input-wrapper input { min-width: 0; flex: 1; width: 100%; border: 0; outline: 0; background: transparent; color: var(--text-main); padding: 1px 0; font-size: 12px; }
+.input-wrapper input::placeholder { color: var(--text-placeholder); }
+.input-wrapper gmp-place-autocomplete { flex: 1 1 auto; min-width: 0; width: 100%; color-scheme: inherit; }
+gmp-place-autocomplete::part(input) { color: var(--text-main) !important; background: transparent !important; border: 0 !important; outline: 0 !important; box-shadow: none !important; font: 500 12px Inter,sans-serif !important; width: 100% !important; min-width: 0 !important; }
+gmp-place-autocomplete::part(input)::placeholder { color: var(--text-placeholder) !important; }
+
+.action-icon, .icon-button { width: 28px; height: 28px; flex: 0 0 28px; border: 0; border-radius: 7px; background: transparent; color: var(--text-muted); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; transition: .18s ease; }
+.action-icon svg, .icon-button svg { width: 16px; height: 16px; }
+.action-icon:hover, .icon-button:hover { color: var(--accent); background: rgba(127,127,127,.13); }
+.btn-remove-cp:hover { color: var(--danger); }
+
+/* Collapsed point: ONLY the compact summary is visible. */
+.point-expanded { display: none; }
+.point-summary { width: 100%; min-width: 0; display: flex; align-items: center; gap: 9px; padding: 8px 9px; border: 1px solid var(--glass-border); border-radius: 9px; background: rgba(127,127,127,.07); color: var(--text-main); text-align: left; cursor: pointer; transition: .18s ease; }
+.point-summary:hover { border-color: var(--accent); background: rgba(59,130,246,.08); }
+.route-node.is-expanded .point-expanded { display: block; }
+.route-node.is-expanded .point-summary { display: none; }
+.point-summary-image-wrap { width: 30px; height: 30px; flex: 0 0 30px; border-radius: 7px; overflow: hidden; background: rgba(127,127,127,.12); display: flex; align-items: center; justify-content: center; }
+.point-summary-image { width: 100%; height: 100%; object-fit: cover; }
+.point-summary-copy { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.point-summary-label { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.point-summary-address { color: var(--text-muted); font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.point-summary-chevron { width: 18px; color: var(--text-muted); transform: rotate(-90deg); }
+.point-summary-chevron svg { width: 15px; height: 15px; }
+
+.point-editor-head { display: flex; align-items: center; justify-content: space-between; margin: 0 1px 6px; }
+.point-editor-type { color: var(--text-main); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .55px; }
+.point-meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-top: 7px; }
+.point-field { min-width: 0; display: flex; flex-direction: column; gap: 5px; color: var(--text-muted); font-size: 9px; text-transform: uppercase; letter-spacing: .55px; font-weight: 700; }
+.point-label-input { width: 100%; min-width: 0; border: 1px solid var(--input-border); border-radius: 7px; outline: 0; background: var(--input-bg); color: var(--text-main); padding: 7px 8px; font-size: 11px; text-transform: none; letter-spacing: 0; }
+.point-label-input:focus { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-glow); }
+.image-picker { min-height: 31px; border: 1px dashed var(--input-border); border-radius: 7px; display: flex; align-items: center; justify-content: center; gap: 5px; cursor: pointer; color: var(--text-muted); text-transform: none; font-size: 10px; letter-spacing: 0; }
+.image-picker:hover { border-color: var(--accent); color: var(--accent); }
+.image-picker svg { width: 14px; height: 14px; }
+.image-picker input { display: none; }
+.point-image-preview-wrap { position: relative; min-height: 0; display: flex; }
+.point-image-preview { width: 100%; height: 70px; object-fit: cover; border-radius: 7px; border: 1px solid var(--glass-border); }
+.point-image-remove { position: absolute; right: 4px; top: 4px; width: 20px; height: 20px; border: 0; border-radius: 50%; background: rgba(0,0,0,.65); color: #fff; cursor: pointer; }
+.point-marker-tools { display: flex; align-items: center; gap: 5px; margin-top: 7px; }
+.point-tool { min-height: 29px; border: 1px solid var(--input-border); border-radius: 7px; padding: 0 8px; display: inline-flex; align-items: center; gap: 5px; color: var(--text-muted); background: transparent; cursor: pointer; font-size: 10px; }
+.point-tool svg { width: 14px; height: 14px; }
+.point-tool:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); background: rgba(59,130,246,.07); }
+.point-tool.danger:hover:not(:disabled) { border-color: var(--danger); color: var(--danger); }
+.point-tool:disabled { opacity: .35; cursor: not-allowed; }
+.marker-state { margin-left: auto; color: var(--text-placeholder); font-size: 9px; white-space: nowrap; }
+.route-node.marker-attached .marker-state { color: var(--success); }
+
+.add-cp-node { cursor: pointer; margin-top: 1px; }
+.add-text-btn { color: var(--accent); font-weight: 700; font-size: 11px; padding: 7px 0; }
+.add-cp-node:hover .add-text-btn { color: var(--accent-hover); }
+
+.route-actions-divider { height: 1px; background: var(--glass-border); margin: 12px 0 12px 34px; }
+.control-group { display: flex; flex-direction: column; gap: 5px; margin-bottom: 11px; }
+.control-group label { color: var(--text-muted); font-size: 9px; text-transform: uppercase; letter-spacing: .6px; font-weight: 700; }
+select { width: 100%; border: 1px solid var(--input-border); border-radius: 8px; background: var(--input-bg); color: var(--text-main); outline: 0; padding: 8px 9px; font-size: 11px; }
+select:focus { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-glow); }
+select option { background: var(--tooltip-bg); color: var(--text-main); }
+.primary-btn { width: 100%; min-height: 39px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: 1px solid rgba(255,255,255,.18); border-radius: 9px; background: var(--accent); color: #fff; cursor: pointer; font-weight: 700; font-size: 12px; box-shadow: 0 8px 20px var(--accent-glow); transition: .18s ease; }
+.primary-btn svg { width: 17px; height: 17px; }
+.primary-btn:hover { background: var(--accent-hover); transform: translateY(-1px); }
+
+/* ---------------- Map marker ---------------- */
+.healthx-map-marker { position: relative; cursor: grab; user-select: none; }
+.healthx-map-marker:active { cursor: grabbing; }
+.map-marker-card { display: flex; align-items: center; gap: 8px; min-width: 190px; max-width: 290px; padding: 6px 8px 6px 6px; border: 1px solid rgba(255,255,255,.26); border-radius: 13px; background: rgba(15,23,42,.94); color: #fff; box-shadow: 0 10px 28px rgba(0,0,0,.45), 0 0 0 1px rgba(255,255,255,.06); transform: translateY(-100%); position: relative; }
+[data-theme="light"] .map-marker-card { background: rgba(255,255,255,.96); color: #0f172a; border-color: rgba(15,23,42,.12); box-shadow: 0 10px 28px rgba(15,23,42,.18); }
+.map-marker-image { width: 46px; height: 46px; flex: 0 0 46px; object-fit: cover; border-radius: 9px; border: 1px solid rgba(255,255,255,.25); }
+.map-marker-info { min-width: 0; flex: 1; }
+.map-marker-label { font-weight: 800; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.map-marker-address { margin-top: 2px; color: rgba(255,255,255,.68); font-size: 9px; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+[data-theme="light"] .map-marker-address { color: #64748b; }
+.map-marker-pin { position: absolute; left: 50%; bottom: -11px; transform: translateX(-50%); width: 22px; height: 22px; border-radius: 50% 50% 50% 0; rotate: -45deg; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 9px; font-weight: 800; border: 2px solid #fff; box-shadow: 0 4px 12px rgba(0,0,0,.35); }
+.map-marker-pin::after { content: ""; rotate: 45deg; }
+.healthx-map-marker.origin .map-marker-pin { background: var(--success); }
+.healthx-map-marker.destination .map-marker-pin { background: var(--danger); }
+.healthx-map-marker.checkpoint .map-marker-pin { background: var(--accent); }
+.map-marker-actions { position: absolute; right: -4px; top: -11px; display: flex; gap: 3px; opacity: 0; transform: translateY(4px); transition: .18s ease; pointer-events: none; }
+.healthx-map-marker:hover .map-marker-actions, .healthx-map-marker:focus-within .map-marker-actions { opacity: 1; transform: translateY(0); pointer-events: auto; }
+.map-marker-action { width: 25px; height: 25px; border: 1px solid rgba(255,255,255,.25); border-radius: 7px; background: rgba(15,23,42,.96); color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: var(--shadow-hard); }
+.map-marker-action svg { width: 13px; height: 13px; }
+.map-marker-action:hover { color: var(--accent-hover); }
+.map-marker-action.marker-action-remove:hover { color: #f87171; }
+
+.empty-state { color: var(--text-muted); font-size: 11px; padding: 8px 0; list-style: none; }
+.spin { animation: healthx-spin 1s linear infinite; }
+@keyframes healthx-spin { to { transform: rotate(360deg); } }
+
+@media (max-width: 700px) {
+    #flyout-container { left: 72px; width: min(410px, calc(100vw - 84px)); }
+    .flyout-panel { width: min(410px, calc(100vw - 84px)); }
+    #top-bar { left: 12px; right: 12px; }
+    #side-dock { left: 10px; }
 }
 
-/* Force New API Web Component to match larger font size inside its Shadow DOM */
-gmp-place-autocomplete::part(input) {
-    font-size: 14px;
-    font-weight: 500;
-    padding: 12px 14px;
-    color: var(--text-main);
-    background: transparent;
-    border: none;
-    outline: none;
-    width: 100%;
+
+.point-editor{display:none}
+.route-node.is-expanded .point-editor{display:block}
+.route-node.is-expanded .point-summary{display:none}
+
+.point-summary{
+    display:flex;
+    align-items:center;
+    width:100%;
 }
 
-/* Action Icons inside input wrapper */
-.action-icon {
-    background: transparent; border: none; color: var(--text-muted); width: 32px; height: 32px; 
-    border-radius: 6px; cursor: pointer; display: flex; justify-content: center; align-items: center; 
-    transition: 0.2s; margin-right: 4px; font-size: 0.95rem; flex-shrink: 0;
-}
-.action-icon:hover { background: var(--border-color); color: var(--text-main); }
-.btn-remove-cp { color: var(--danger) !important; }
-
-/* --- DYNAMIC UI STATES: EMPTY vs FILLED --- */
-/* By default, hide the Edit button so user can just type freely */
-.btn-edit-address { display: none; }
-
-/* When data is present, show the Edit button */
-.route-node.has-data .btn-edit-address { display: flex; }
-
-/* When data is present, hide the GPS and Map pickers to keep it clean */
-.route-node.has-data .btn-loc,
-.route-node.has-data .btn-map { display: none; }
-
-.add-text-btn { color: var(--accent); font-weight: 600; font-size: 0.9rem; padding: 10px 0; transition: 0.2s; }
-.route-node.add-cp-node:hover .add-text-btn { color: var(--accent-hover); }
-
-/* Buttons & Selects */
-.control-group { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
-.control-group label { font-size: 0.8rem; color: var(--text-muted); font-weight: 600;}
-select { background: var(--input-bg); border: 1px solid var(--border-color); color: var(--text-main); padding: 10px; border-radius: 6px; outline: none; font-size: 0.9rem; width: 100%; }
-.primary-btn { background: var(--accent); color: white; border: none; padding: 12px; border-radius: 6px; cursor: pointer; font-weight: 600; transition: 0.2s; margin-top: 5px;}
-.primary-btn:hover { background: var(--accent-hover); }
-
-/* --- GOOGLE PLACES AUTOCOMPLETE DROPDOWN FIXES --- */
-.pac-container {
-    z-index: 100000 !important; background-color: var(--tooltip-bg); border: 1px solid var(--border-color);
-    box-shadow: var(--shadow); border-radius: 0 0 6px 6px; font-family: 'Inter', sans-serif;
-}
-.pac-item { color: var(--text-main); border-top: 1px solid var(--border-color); padding: 8px; cursor: pointer;}
-.pac-item:hover { background-color: var(--border-color); }
-.pac-item-query { color: var(--accent); font-weight: 600; }
-
-/* --- TACTICAL MARKERS --- */
-.tactical-marker {
-    position: relative; display: flex; align-items: center; justify-content: center;
-    width: 36px; height: 36px; border-radius: 50%; color: white; font-weight: bold; 
-    box-shadow: 0 4px 6px rgba(0,0,0,0.5); border: 2px solid white; cursor: grab; z-index: 2; transition: transform 0.1s;
-}
-.tactical-marker:active { cursor: grabbing; z-index: 10; transform: scale(1.1); }
-
-.tactical-marker.origin { background-color: #10b981; }
-.tactical-marker.destination { background-color: #ef4444; }
-.tactical-marker.checkpoint { background-color: #3b82f6; }
-
-.tactical-marker .seq-num { 
-    position: absolute; top: -6px; left: -6px; background: #000; font-size: 11px; 
-    width: 18px; height: 18px; border-radius: 50%; display: flex; align-items: center; 
-    justify-content: center; border: 1px solid white;
+.point-summary>span:nth-child(2){
+    min-width:0;
+    flex:1;
+    display:flex;
+    flex-direction:column;
+    gap:2px;
 }
 
-.tactical-marker .coords-tooltip {
-    position: absolute; bottom: 120%; left: 50%; transform: translateX(-50%);
-    background: rgba(0,0,0,0.85); padding: 4px 8px; border-radius: 4px;
-    font-size: 0.75rem; white-space: nowrap; opacity: 0; pointer-events: none; transition: 0.2s;
-    backdrop-filter: blur(4px); border: 1px solid rgba(255,255,255,0.2); font-weight: 600;
+.point-summary>b{
+    color:var(--text-muted);
+    font-size:16px;
 }
-.tactical-marker:hover .coords-tooltip { opacity: 1; }
 
-.marker-controls {
-    position: absolute; top: -15px; right: -30px; display: flex; flex-direction: column; gap: 4px;
-    opacity: 0; transition: 0.2s; pointer-events: none; z-index: 20;
+.point-meta{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:7px;
+    margin-top:7px;
 }
-.tactical-marker.show-controls { z-index: 15; }
-.tactical-marker.show-controls .marker-controls { opacity: 1; pointer-events: auto; }
 
-.marker-btn {
-    width: 24px; height: 24px; border-radius: 50%; border: none; cursor: pointer; display: flex; align-items: center; 
-    justify-content: center; font-size: 12px; background: white; color: black; box-shadow: 0 2px 4px rgba(0,0,0,0.3); transition: 0.2s;
+.point-meta>label{
+    display:flex;
+    flex-direction:column;
+    gap:5px;
+    color:var(--text-muted);
+    font-size:9px;
+    font-weight:700;
 }
-.marker-btn:hover { background: #e2e8f0; transform: scale(1.1); }
 
-.marker-edit-panel {
-    position: absolute; left: 130%; top: -10px; background: var(--bg-glass); backdrop-filter: blur(10px); 
-    padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); display: flex; gap: 8px; 
-    opacity: 0; pointer-events: none; transition: 0.2s; box-shadow: var(--shadow);
+.point-label-input{
+    width:100%;
+    padding:7px 8px;
+    border:1px solid var(--input-border);
+    border-radius:7px;
+    background:var(--input-bg);
+    color:var(--text-main);
+    outline:0;
+    font-size:11px;
 }
-.marker-edit-panel.show { opacity: 1; pointer-events: auto; }
-.icon-option { background: transparent; border: none; font-size: 1.2rem; cursor: pointer; transition: transform 0.2s; padding: 2px; }
-.icon-option:hover { transform: scale(1.3); }
+
+.image-picker{
+    min-height:31px;
+    border:1px dashed var(--input-border);
+    border-radius:7px;
+    display:flex!important;
+    align-items:center;
+    justify-content:center;
+    cursor:pointer;
+    color:var(--text-muted)!important;
+    font-size:10px!important;
+}
+
+.image-picker input{display:none}
+
+.point-image-preview-wrap{
+    grid-column:1/-1;
+    position:relative;
+}
+
+.point-image-preview{
+    width:100%;
+    height:70px;
+    object-fit:cover;
+    border-radius:7px;
+}
+
+.point-image-remove{
+    position:absolute;
+    right:4px;
+    top:4px;
+    width:20px;
+    height:20px;
+    border:0;
+    border-radius:50%;
+    background:#000b;
+    color:#fff;
+    cursor:pointer;
+}
+
+#checkpoints-list{
+    display:flex;
+    flex-direction:column;
+    gap:7px;
+}
+
+.map-marker-card{
+    min-width:210px;
+    max-width:330px;
+}
+
+.map-marker-media:empty{
+    display:none;
+}
+
+.map-marker-image{
+    width:70px;
+    height:70px;
+    object-fit:cover;
+    border-radius:9px;
+}
+
+.map-marker-label-input{
+    width:100%;
+    min-width:0;
+    border:0;
+    outline:0;
+    background:transparent;
+    color:inherit;
+    font:800 11px Inter,sans-serif;
+}
+
+.map-marker-label-input:focus{
+    border-bottom:1px solid var(--accent);
+}
+
+.map-marker-actions button{
+    width:25px;
+    height:25px;
+    border:1px solid var(--glass-border);
+    border-radius:7px;
+    background:var(--tooltip-bg);
+    color:var(--text-main);
+    cursor:pointer;
+}
