@@ -20,7 +20,6 @@ const emergencySessionSchema = new mongoose.Schema({
         trim: true,
         default: ''
     },
-    // Hashed password for standard login
     passcodeHash: {
         type: String,
         default: null
@@ -29,7 +28,6 @@ const emergencySessionSchema = new mongoose.Schema({
         type: Boolean,
         default: false
     },
-    // Magic token for instant link-based joining
     authKey: {
         type: String,
         required: true,
@@ -45,24 +43,23 @@ const emergencySessionSchema = new mongoose.Schema({
     createdBy: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'UserAuth',
-        default: null // Optional: can be null if emergency is initialized by unauthenticated device
+        default: null
     }
 }, { timestamps: true });
 
 // Pre-save hook: Hash passcode if set or modified
-emergencySessionSchema.pre('save', async function (next) {
+emergencySessionSchema.pre('save', async function () {
     if (!this.isModified('passcodeHash') || !this.passcodeHash) {
-        return next();
+        return;
     }
     const salt = await bcrypt.genSalt(10);
     this.passcodeHash = await bcrypt.hash(this.passcodeHash, salt);
     this.isPasswordProtected = true;
-    next();
 });
 
 // Compare password helper
 emergencySessionSchema.methods.comparePasscode = async function (candidatePassword) {
-    if (!this.passcodeHash) return true; // If no password was configured
+    if (!this.passcodeHash) return true;
     return bcrypt.compare(candidatePassword, this.passcodeHash);
 };
 

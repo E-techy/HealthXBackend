@@ -1,49 +1,17 @@
 const express = require('express');
 const router = express.Router();
 const emergencyController = require('../controllers/emergencyController');
-const { requireJWT } = require('../middlewares/authMiddleware');
-const { requireDelegatedAccess } = require('../middlewares/delegatedAccessMiddleware');
-const { requirePoliceJWT } = require('../middlewares/policeAuthMiddleware');
 
-// ==========================================
-// USER ROUTES (Android App)
-// ==========================================
+// 1. Create a new emergency session (Generates tracking ID, password hash, magic key, and link)
+router.post('/create', emergencyController.create);
 
-// High-frequency endpoint for the device to post data
-router.post('/log-location', requireJWT, emergencyController.logLocation);
+// 2. Direct link login (Validates authKey from the shared link, returns session token)
+router.post('/join/magic', emergencyController.joinViaMagicKey);
 
-// User manages their emergency contacts
-router.post('/contacts', requireJWT, emergencyController.addEmergencyContact);
+// 3. Manual login (Tracking ID + password)
+router.post('/join/credentials', emergencyController.joinViaCredentials);
 
-// ==========================================
-// DELEGATED ACCESS ROUTES (Emergency Contacts)
-// ==========================================
-
-// A trusted contact views the location. 
-// Requires "X-Target-User-Id" header from the Android app.
-router.get(
-    '/locations/shared', 
-    requireJWT, 
-    requireDelegatedAccess('SEE_EMERGENCY_LOCATION'), 
-    emergencyController.getLiveLocations
-);
-
-// ==========================================
-// POLICE PORTAL ROUTES (Web Dashboard)
-// ==========================================
-
-// Police trigger the remote start of the tracking session
-router.post(
-    '/police/initiate', 
-    requirePoliceJWT, 
-    emergencyController.policeInitiateTracking
-);
-
-// Police fetch the live stream of data
-router.get(
-    '/police/locations', 
-    requirePoliceJWT, 
-    emergencyController.getLiveLocations
-);
+// 4. Public details check (Checks title, if password is required, status)
+router.get('/:emergencyTrackingId/info', emergencyController.getInfo);
 
 module.exports = router;
