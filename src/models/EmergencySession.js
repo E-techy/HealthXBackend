@@ -40,11 +40,17 @@ const emergencySessionSchema = new mongoose.Schema({
         default: 'ACTIVE',
         index: true
     },
+    // The Owner / Admin of this emergency
     createdBy: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'UserAuth',
-        default: null
-    }
+        required: true
+    },
+    // Access Control List (ACL). If populated, ONLY these users (and creator) can join.
+    allowedUsers: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'UserAuth'
+    }]
 }, { timestamps: true });
 
 // Pre-save hook: Hash passcode if set or modified
