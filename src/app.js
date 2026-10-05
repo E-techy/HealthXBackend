@@ -9,6 +9,8 @@ const accessRoutes = require('./routes/accessRoutes');
 const configRoutes = require('./routes/configRoutes');
 const mapRoutes = require('./routes/mapRoutes');
 const emergencyRoutes = require('./routes/emergencyRoutes');
+const vehicleRoutes = require('./routes/vehicleRoutes');
+
 
 
 // ADD THIS IMPORT
@@ -52,6 +54,9 @@ app.use('/api/maps', mapRoutes);
 app.use('/api/config', configRoutes);
 
 app.use('/api/emergency', emergencyRoutes);
+
+app.use('/api/vehicles', vehicleRoutes);
+
 
 
 
