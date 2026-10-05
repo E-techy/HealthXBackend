@@ -1,10 +1,20 @@
 const VehicleRegistration = require('../models/VehicleRegistration');
 const EmergencySession = require('../models/EmergencySession');
+const { encrypt, maskSSN } = require('../utils/cryptoUtils');
 
 // 1. Register a Global Vehicle
 const registerOrUpdateVehicle = async (ownerId, vehicleData) => {
-    if (vehicleData.teamMembers) {
-        vehicleData.teamMembers = vehicleData.teamMembers.map(m => ({ ...m, rawSsn: m.ssn }));
+    // Explicitly process and encrypt SSNs before hitting the database
+    let processedMembers = [];
+    if (vehicleData.teamMembers && Array.isArray(vehicleData.teamMembers)) {
+        processedMembers = vehicleData.teamMembers.map(m => {
+            const memberObj = { fullName: m.fullName, role: m.role };
+            if (m.ssn) {
+                memberObj.ssnEncrypted = encrypt(m.ssn);
+                memberObj.ssnMasked = maskSSN(m.ssn);
+            }
+            return memberObj;
+        });
     }
 
     const vehicle = await VehicleRegistration.findOneAndUpdate(
@@ -22,10 +32,11 @@ const registerOrUpdateVehicle = async (ownerId, vehicleData) => {
             crew: {
                 driverName: vehicleData.driverName,
                 teamName: vehicleData.teamName,
-                members: vehicleData.teamMembers
+                members: processedMembers
             }
         },
-        { new: true, upsert: true, runValidators: true }
+        // FIXED: Replaced 'new: true' with 'returnDocument: "after"' to resolve the Mongoose deprecation warning
+        { returnDocument: 'after', upsert: true, runValidators: true }
     );
     return vehicle;
 };

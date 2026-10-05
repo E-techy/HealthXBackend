@@ -1,5 +1,4 @@
 const mongoose = require('mongoose');
-const { encrypt, maskSSN } = require('../utils/cryptoUtils');
 
 const vehicleRegistrationSchema = new mongoose.Schema({
     vehicleId: { type: String, required: true, unique: true, index: true },
@@ -35,8 +34,8 @@ const vehicleRegistrationSchema = new mongoose.Schema({
         members: [{
             fullName: String,
             role: String,
-            ssnEncrypted: String, 
-            ssnMasked: String     
+            ssnEncrypted: String, // Kept out of APIs, decrypted only when strictly needed
+            ssnMasked: String     // Safe for UI (e.g. ***-**-6789)
         }]
     },
     
@@ -53,18 +52,5 @@ const vehicleRegistrationSchema = new mongoose.Schema({
 
 // Required for Geospatial Search ($geoNear)
 vehicleRegistrationSchema.index({ lastKnownLocation: '2dsphere' });
-
-vehicleRegistrationSchema.pre('save', function(next) {
-    if (this.isModified('crew.members')) {
-        this.crew.members.forEach(member => {
-            if (member.rawSsn) {
-                member.ssnEncrypted = encrypt(member.rawSsn);
-                member.ssnMasked = maskSSN(member.rawSsn);
-                member.rawSsn = undefined; 
-            }
-        });
-    }
-    next();
-});
 
 module.exports = mongoose.model('VehicleRegistration', vehicleRegistrationSchema);
