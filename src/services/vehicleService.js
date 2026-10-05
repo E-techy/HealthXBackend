@@ -1,10 +1,10 @@
 const VehicleRegistration = require('../models/VehicleRegistration');
 const EmergencySession = require('../models/EmergencySession');
 const { encrypt, maskSSN } = require('../utils/cryptoUtils');
+const { broadcastEvent, EVENTS } = require('../socket/socketSetup');
 
 // 1. Register a Global Vehicle
 const registerOrUpdateVehicle = async (ownerId, vehicleData) => {
-    // Explicitly process and encrypt SSNs before hitting the database
     let processedMembers = [];
     if (vehicleData.teamMembers && Array.isArray(vehicleData.teamMembers)) {
         processedMembers = vehicleData.teamMembers.map(m => {
@@ -35,7 +35,6 @@ const registerOrUpdateVehicle = async (ownerId, vehicleData) => {
                 members: processedMembers
             }
         },
-        // FIXED: Replaced 'new: true' with 'returnDocument: "after"' to resolve the Mongoose deprecation warning
         { returnDocument: 'after', upsert: true, runValidators: true }
     );
     return vehicle;
@@ -54,6 +53,17 @@ const attachToEmergency = async (vehicleId, emergencyTrackingId, ownerId) => {
         vehicle.activeEmergencies.push(emergency.emergencyTrackingId);
         vehicle.connectionStatus = 'CONNECTED';
         await vehicle.save();
+
+        // 🟢 BROADCAST: Vehicle joined
+        const safeVehicleData = vehicle.toObject();
+        if (safeVehicleData.crew && safeVehicleData.crew.members) {
+            safeVehicleData.crew.members.forEach(m => delete m.ssnEncrypted);
+        }
+        
+        broadcastEvent(emergency.emergencyTrackingId, EVENTS.VEHICLE_CONNECTED, {
+            vehicle: safeVehicleData,
+            message: `${vehicle.identity.vehicleName} has joined the emergency.`
+        });
     }
     return vehicle;
 };
@@ -68,6 +78,13 @@ const detachFromEmergency = async (vehicleId, emergencyTrackingId, ownerId) => {
     if (vehicle.activeEmergencies.length === 0) vehicle.connectionStatus = 'DISCONNECTED';
     
     await vehicle.save();
+
+    // 🔴 BROADCAST: Vehicle left
+    broadcastEvent(emergencyTrackingId, EVENTS.VEHICLE_DISCONNECTED, {
+        vehicleId: vehicleId,
+        message: `${vehicle.identity.vehicleName} has left the emergency.`
+    });
+
     return vehicle;
 };
 
@@ -81,33 +98,50 @@ const updateTelemetry = async (vehicleId, ownerId, updates) => {
     if (updates.batteryPercentage !== undefined) vehicle.telemetry.batteryPercentage = updates.batteryPercentage;
     if (updates.assignedTask !== undefined) vehicle.telemetry.assignedTask = updates.assignedTask;
     
-    // Update global location for radius searches
     if (updates.longitude && updates.latitude) {
         vehicle.lastKnownLocation = { type: 'Point', coordinates: [updates.longitude, updates.latitude] };
     }
 
     await vehicle.save();
+
+    // 🟡 BROADCAST: Telemetry update to all active emergencies
+    vehicle.activeEmergencies.forEach(emergencyTrackingId => {
+        broadcastEvent(emergencyTrackingId, EVENTS.VEHICLE_METADATA_UPDATED, {
+            vehicleId: vehicleId,
+            telemetry: vehicle.telemetry
+        });
+
+        // 🔥 CRITICAL ALERTS TRIGGER (e.g. Fuel under 15%)
+        if (vehicle.telemetry.fuelPercentage !== undefined && vehicle.telemetry.fuelPercentage <= 15) {
+            broadcastEvent(emergencyTrackingId, EVENTS.VEHICLE_CRITICAL_ALERT, {
+                vehicleId: vehicleId,
+                alertType: 'LOW_FUEL',
+                severity: 'CRITICAL',
+                message: `${vehicle.identity.vehicleName} is running critically low on fuel (${vehicle.telemetry.fuelPercentage}%).`
+            });
+        }
+    });
+
     return vehicle;
 };
 
-// 5. Geospatial Radius Search (Global Public Vehicles)
+// 5. Geospatial Radius Search
 const findNearbyPublicVehicles = async (longitude, latitude, radiusInKm) => {
     const radiusInMeters = radiusInKm * 1000;
     
     const vehicles = await VehicleRegistration.find({
         isPublic: true,
         lastKnownLocation: {
-            $near: {
-                $geometry: { type: "Point", coordinates: [longitude, latitude] },
+            $near: {$geometry: { type: "Point", coordinates: [longitude, latitude] },
                 $maxDistance: radiusInMeters
             }
         }
-    }).select('-crew.members.ssnEncrypted -ownerId'); // Protect privacy
+    }).select('-crew.members.ssnEncrypted -ownerId'); 
     
     return vehicles;
 };
 
-// 6. Get Snapshot of Vehicles in a specific Emergency
+// 6. Get Snapshot of Vehicles
 const getEmergencySnapshot = async (emergencyTrackingId) => {
     const vehicles = await VehicleRegistration.find({ 
         activeEmergencies: emergencyTrackingId.toUpperCase() 
