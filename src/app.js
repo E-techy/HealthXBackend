@@ -10,6 +10,8 @@ const configRoutes = require('./routes/configRoutes');
 const mapRoutes = require('./routes/mapRoutes');
 const emergencyRoutes = require('./routes/emergencyRoutes');
 const vehicleRoutes = require('./routes/vehicleRoutes');
+const trackingRoutes = require('./routes/trackingRoutes');
+
 
 
 
@@ -56,6 +58,9 @@ app.use('/api/config', configRoutes);
 app.use('/api/emergency', emergencyRoutes);
 
 app.use('/api/vehicles', vehicleRoutes);
+
+app.use('/api/tracking', trackingRoutes);
+
 
 
 
