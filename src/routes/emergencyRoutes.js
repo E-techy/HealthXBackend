@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const emergencyController = require('../controllers/emergencyController');
-const messageController = require('../controllers/emergencyMessageController'); // NEW
+const messageController = require('../controllers/emergencyMessageController');
 const { requireJWT } = require('../middlewares/authMiddleware');
 
 // ============================================
@@ -14,19 +14,22 @@ router.delete('/:id', requireJWT, emergencyController.deleteSession);
 router.post('/:id/invite', requireJWT, emergencyController.invite);
 
 // ============================================
-// PUBLIC & PARTICIPANT ROUTES
+// PUBLIC DISCOVERY ROUTES (NEW)
+// ============================================
+// Must be declared before `/:id` routes
+router.get('/search', emergencyController.searchPublic);
+
+// ============================================
+// PUBLIC & PARTICIPANT AUTHENTICATION
 // ============================================
 router.post('/join/magic', emergencyController.joinViaMagicKey);
 router.post('/join/credentials', emergencyController.joinViaCredentials);
 router.get('/:id/info', emergencyController.getInfo);
 
 // ============================================
-// 📣 LIVE BROADCAST ROUTES (New)
+// LIVE BROADCAST ROUTES (Sockets)
 // ============================================
-// Global broadcast to ALL listeners
 router.post('/broadcast/global', requireJWT, messageController.sendGlobalBroadcast);
-
-// Room-specific broadcasts
 router.post('/:emergencyTrackingId/broadcast/custom', requireJWT, messageController.sendCustomMessage);
 router.post('/:emergencyTrackingId/broadcast/pin', requireJWT, messageController.sendPinnedMessage);
 

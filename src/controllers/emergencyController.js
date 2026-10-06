@@ -1,28 +1,30 @@
 const emergencyService = require('../services/emergencyService');
 const jwt = require('jsonwebtoken');
 
-// Helper to extract JWT ID if present (used for joining routes to check against ACL)
 const getOptionalUserId = (req) => {
     if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
         try {
             const token = req.headers.authorization.split(' ')[1];
             const decoded = jwt.verify(token, process.env.JWT_SECRET);
             return decoded.id;
-        } catch (e) {
-            return null; // Invalid token
-        }
+        } catch (e) { return null; }
     }
-    return null; // No token provided
+    return null;
 };
 
 exports.create = async (req, res) => {
     try {
-        const { title, description, password } = req.body;
+        // Extract all standard and new spatial/metadata fields
+        const { title, description, password, isPublicVisibility, location, address, victimMetadata } = req.body;
+        
         if (!title) return res.status(400).json({ success: false, message: 'Title is required.' });
 
         const baseUrl = `${req.protocol}://${req.get('host')}`;
-        // requireJWT middleware ensures req.user is set
-        const result = await emergencyService.createEmergency({ title, description, password, userId: req.user.id, baseUrl });
+        
+        const result = await emergencyService.createEmergency({ 
+            title, description, password, isPublicVisibility, location, address, victimMetadata,
+            userId: req.user.id, baseUrl 
+        });
 
         return res.status(201).json({ success: true, message: 'Emergency session created.', data: result });
     } catch (error) {
@@ -36,6 +38,35 @@ exports.updateDetails = async (req, res) => {
         return res.status(200).json({ success: true, message: 'Emergency details updated.', data: updated });
     } catch (error) {
         return res.status(403).json({ success: false, message: error.message });
+    }
+};
+
+// -----------------------------------------------------
+// NEW: PUBLIC SEARCH API
+// -----------------------------------------------------
+exports.searchPublic = async (req, res) => {
+    try {
+        // Extract query parameters for the search engine
+        const filters = {
+            lng: req.query.lng,
+            lat: req.query.lat,
+            radiusKm: req.query.radius,
+            state: req.query.state,
+            city: req.query.city,
+            country: req.query.country,
+            startDate: req.query.startDate,
+            limit: req.query.limit || 50
+        };
+
+        const emergencies = await emergencyService.searchPublicEmergencies(filters);
+        
+        return res.status(200).json({ 
+            success: true, 
+            count: emergencies.length, 
+            data: emergencies 
+        });
+    } catch (error) {
+        return res.status(500).json({ success: false, message: error.message });
     }
 };
 
