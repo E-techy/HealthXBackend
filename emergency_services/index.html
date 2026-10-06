@@ -8,10 +8,13 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     
-    <!-- Load Core Layout CSS -->
+      <!-- Load Core Layout CSS -->
     <link rel="stylesheet" href="/emergency/css/layout.css">
-    <!-- Load Routing Manager CSS (created in previous step) -->
     <link rel="stylesheet" href="/emergency/css/routingManager.css">
+    <!-- ADD THIS LINE: -->
+    <link rel="stylesheet" href="/emergency/css/emergencyManager.css">
+
+    
 </head>
 
 <body>
@@ -48,6 +51,15 @@
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg>
                 <span class="tooltip">Live Tracking</span>
             </button>
+                        <!-- NEW: Emergency Manager Button -->
+            <button class="dock-btn" id="btn-open-em-manager" type="button" title="Emergency Manager">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                    <path d="M12 8v4M12 16h.01"/>
+                </svg>
+                <span class="tooltip">Emergencies</span>
+            </button>
+            <!-- End NEW -->
 
             <div class="dock-spacer"></div>
 

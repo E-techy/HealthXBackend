@@ -64,6 +64,22 @@
                 });
             }
 
+             const emManagerBtn = document.getElementById("btn-open-em-manager");
+            if (emManagerBtn) {
+                emManagerBtn.addEventListener("click", (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.closeAllPanels(); // Close flyouts so they don't overlap
+
+                    // We will create window.EmergencyManager in the next file
+                    if (window.EmergencyManager) {
+                        window.EmergencyManager.show();
+                    } else {
+                        console.warn("EmergencyManager not loaded yet.");
+                    }
+                });
+            }
+
             // Prevent clicks inside panel from bubbling up and closing it
             this.panels.forEach((panel) => {
                 panel.addEventListener("click", (e) => e.stopPropagation());
