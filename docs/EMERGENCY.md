@@ -1,6 +1,6 @@
 # Emergency Session Management API
 
-This module manages real-time emergency tracking sessions, enforcing **Role-Based Access Control (RBAC)** and **Access Control Lists (ACL)**. Only the Owner (Creator) can modify the incident, and they can optionally restrict access to specific `userId`s via email invites.
+This module manages real-time emergency tracking sessions, enforcing **Role-Based Access Control (RBAC)** and **Access Control Lists (ACL)**. It also supports **Global Public Discovery** for crowdsourced disaster relief, and **Live Event Broadcasting** via WebSockets.
 
 ---
 
@@ -8,6 +8,7 @@ This module manages real-time emergency tracking sessions, enforcing **Role-Base
 
 - **Owner/Admin Routes:** Require a standard user JWT (`Authorization: Bearer <token>`).
 - **Participant/Join Routes:** Require a standard user JWT **only if** the emergency has invited users (ACL enabled). If the ACL is empty, the link/password is public to anyone.
+- **Search & Info Routes:** Fully public (No Auth Required).
 
 ---
 
@@ -15,17 +16,36 @@ This module manages real-time emergency tracking sessions, enforcing **Role-Base
 
 ## Create Emergency
 
-Creates a session. The user making the request becomes the Owner.
+Creates a session. The user making the request becomes the Owner. You can optionally make the emergency public and attach geospatial/victim metadata.
 
 - **URL:** `POST /api/emergency/create`
 - **Headers:** `Authorization: Bearer <user_jwt>`
-- **Body:**
+
+### Body
 
 ```json
 {
-  "title": "Highway Collision",
-  "description": "Multi-vehicle pileup on I-95",
-  "password": "securePass123"
+  "title": "Missing Person Search - Sector 4",
+  "description": "Search party coordination for a missing hiker.",
+  "password": "securePass123",
+  "isPublicVisibility": true,
+  "location": {
+    "lng": 77.2090,
+    "lat": 28.6139
+  },
+  "address": {
+    "city": "New Delhi",
+    "state": "Delhi",
+    "country": "India"
+  },
+  "victimMetadata": {
+    "isPublic": true,
+    "name": "Jane Doe",
+    "imageUri": "https://example.com/images/janedoe.jpg",
+    "rewardAmount": 5000,
+    "rewardCurrency": "USD",
+    "extraDetails": "Last seen wearing a red hiking jacket."
+  }
 }
 ```
 
@@ -37,7 +57,7 @@ Creates a session. The user making the request becomes the Owner.
   "message": "Emergency session created.",
   "data": {
     "emergencyTrackingId": "EM-XXXX-YYYY",
-    "title": "Highway Collision",
+    "title": "Missing Person Search - Sector 4",
     "status": "ACTIVE",
     "isPasswordProtected": true,
     "authKey": "4f9d21c...",
@@ -51,20 +71,24 @@ Creates a session. The user making the request becomes the Owner.
 
 ## Update Emergency Details
 
+Updates text details, visibility, address, location, or victim metadata.
+
 - **URL:** `PUT /api/emergency/:emergencyTrackingId`
 - **Headers:** `Authorization: Bearer <owner_jwt>`
-- **Body:**
+- **Body:** *(Any combination of the fields used in Create Emergency)*
 
 ```json
 {
-  "title": "Highway Collision - Sector 4",
-  "description": "Updated situation report."
+  "title": "Missing Person Search - Sector 4 (Expanded)",
+  "victimMetadata": {
+    "rewardAmount": 10000
+  }
 }
 ```
 
 ### Success Response (200 OK)
 
-Returns the updated emergency object.
+Returns the fully updated emergency object.
 
 ---
 
@@ -72,7 +96,8 @@ Returns the updated emergency object.
 
 - **URL:** `PATCH /api/emergency/:emergencyTrackingId/status`
 - **Headers:** `Authorization: Bearer <owner_jwt>`
-- **Body:**
+
+### Body
 
 ```json
 {
@@ -94,7 +119,8 @@ Restricts the emergency. Automatically emails the magic link and details to the 
 
 - **URL:** `POST /api/emergency/:emergencyTrackingId/invite`
 - **Headers:** `Authorization: Bearer <owner_jwt>`
-- **Body:**
+
+### Body
 
 ```json
 {
@@ -141,11 +167,72 @@ Permanently removes the incident from the database.
 
 ---
 
-# 2. Participant (Join) Routes
+# 2. Public Discovery Routes (NEW)
 
-Participants receive a **Session Token** upon successful join. This token must be used for WebSocket connections and subsequent GPS/telemetry updates.
+## Search Public Emergencies
+
+Allows users to find active, public emergencies based on text filters or geospatial radius (e.g., "Find all emergencies within 50km of my location in Delhi"). Secure data (like allowedUsers and authKeys) is omitted. Victim data is hidden if `victimMetadata.isPublic` is false.
+
+- **URL:** `GET /api/emergency/search`
+- **Auth:** Public
+
+### Query Parameters (All Optional)
+
+- `lng`: Center longitude.
+- `lat`: Center latitude.
+- `radius`: Search radius in kilometers (requires `lng` & `lat`).
+- `state`, `city`, `country`: Text-based regional filters.
+- `startDate`: Find incidents created after this timestamp.
+- `limit`: Max results (default 50).
+
+### Example Request
+
+```text
+GET /api/emergency/search?lng=77.2090&lat=28.6139&radius=50&state=Delhi
+```
+
+### Success Response (200 OK)
+
+```json
+{
+  "success": true,
+  "count": 1,
+  "data": [
+    {
+      "_id": "67011d...",
+      "emergencyTrackingId": "EM-XXXX-YYYY",
+      "title": "Missing Person Search - Sector 4",
+      "description": "Search party coordination for a missing hiker.",
+      "status": "ACTIVE",
+      "isPasswordProtected": true,
+      "location": {
+        "type": "Point",
+        "coordinates": [77.2090, 28.6139]
+      },
+      "address": {
+        "city": "New Delhi",
+        "state": "Delhi",
+        "country": "India"
+      },
+      "victimMetadata": {
+        "isPublic": true,
+        "name": "Jane Doe",
+        "imageUri": "https://example.com/images/janedoe.jpg",
+        "rewardAmount": 5000,
+        "rewardCurrency": "USD",
+        "extraDetails": "Last seen wearing a red hiking jacket."
+      },
+      "createdAt": "2026-10-06T06:38:03.112Z"
+    }
+  ]
+}
+```
 
 ---
+
+# 3. Participant (Join) Routes
+
+Participants receive a Session Token upon successful join. This token must be used for WebSocket connections and subsequent GPS/telemetry updates.
 
 ## Join via Magic Link (`authKey`)
 
@@ -153,7 +240,8 @@ Bypasses manual password entry.
 
 - **URL:** `POST /api/emergency/join/magic`
 - **Headers:** `Authorization: Bearer <user_jwt>` *(Required if incident is ACL-restricted)*
-- **Body:**
+
+### Body
 
 ```json
 {
@@ -170,19 +258,11 @@ Bypasses manual password entry.
   "message": "Authenticated via link successfully.",
   "data": {
     "emergencyTrackingId": "EM-XXXX-YYYY",
-    "title": "Highway Collision",
+    "title": "Missing Person Search - Sector 4",
     "token": "eyJhbG..."
   }
 }
 ```
-
-### Error Response (401 Unauthorized)
-
-```text
-Access denied. You are not on the permitted responder list.
-```
-
-> This response occurs if the user is blocked by the ACL.
 
 ---
 
@@ -192,7 +272,8 @@ Manual entry via Tracking ID + Password.
 
 - **URL:** `POST /api/emergency/join/credentials`
 - **Headers:** `Authorization: Bearer <user_jwt>` *(Required if incident is ACL-restricted)*
-- **Body:**
+
+### Body
 
 ```json
 {
@@ -205,17 +286,11 @@ Manual entry via Tracking ID + Password.
 
 Returns the session token.
 
-### Error Response (401 Unauthorized)
-
-```text
-Invalid passcode.
-```
-
 ---
 
 ## Get Public Info
 
-Fetches metadata for UI rendering (e.g., to check if a password field should be shown).
+Fetches metadata for UI rendering before a user joins. Victim data is dynamically hidden if marked private.
 
 - **URL:** `GET /api/emergency/:emergencyTrackingId/info`
 - **Auth:** Public
@@ -228,14 +303,81 @@ Fetches metadata for UI rendering (e.g., to check if a password field should be 
   "data": {
     "_id": "67011d...",
     "emergencyTrackingId": "EM-XXXX-YYYY",
-    "title": "Highway Collision",
+    "title": "Missing Person Search - Sector 4",
+    "description": "Search party coordination...",
     "status": "ACTIVE",
     "isPasswordProtected": true,
-    "createdBy": "60d5eb...",
-    "allowedUsers": [
-      "60d5ec..."
-    ],
-    "createdAt": "2026-10-05T06:38:03.112Z"
+    "isPublicVisibility": true,
+    "address": {
+      "city": "New Delhi"
+    },
+    "location": {
+      "coordinates": [77.2090, 28.6139]
+    },
+    "createdAt": "2026-10-06T06:38:03.112Z"
   }
+}
+```
+
+---
+
+# 4. Live Broadcast Routes (WebSockets)
+
+These HTTP routes trigger Socket.io events. Connected UI clients listening to these socket events will instantly receive the payloads.
+
+### Valid Levels
+
+`normal`, `alert`, `event`, `crash`
+
+---
+
+## Send Global Broadcast
+
+Sends a message to EVERY client connected to the WebSocket server, regardless of the room they are in.
+
+- **URL:** `POST /api/emergency/broadcast/global`
+- **Headers:** `Authorization: Bearer <admin_jwt>`
+
+### Body
+
+```json
+{
+  "message": "System-wide maintenance in 5 minutes.",
+  "level": "alert"
+}
+```
+
+---
+
+## Send Room Custom Message
+
+Broadcasts a standard message to all participants currently joined to a specific emergency room.
+
+- **URL:** `POST /api/emergency/:emergencyTrackingId/broadcast/custom`
+- **Headers:** `Authorization: Bearer <owner_jwt>`
+
+### Body
+
+```json
+{
+  "message": "Rescue team Alpha has spotted the target.",
+  "level": "event"
+}
+```
+
+---
+
+## Send Room Pinned Message
+
+Sends a high-priority message designed to be "pinned" or "stickied" to the top of the UI for all participants in the emergency room.
+
+- **URL:** `POST /api/emergency/:emergencyTrackingId/broadcast/pin`
+- **Headers:** `Authorization: Bearer <owner_jwt>`
+
+### Body
+
+```json
+{
+  "message": "Rendezvous point changed to Base Camp 2. Proceed immediately."
 }
 ```
