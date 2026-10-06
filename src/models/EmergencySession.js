@@ -35,14 +35,15 @@ const emergencySessionSchema = new mongoose.Schema({
         country: { type: String, trim: true, index: true }
     },
 
-    // Victim / Incident Specific Details
     victimMetadata: {
-        isPublic: { type: Boolean, default: false }, // If true, details are exposed in public search
+        isPublic: { type: Boolean, default: false }, 
         name: { type: String, trim: true },
-        imageUri: { type: String }, // URL to victim's photo
+        age: { type: Number },                     // <-- ADD THIS
+        gender: { type: String, trim: true },      // <-- ADD THIS
+        imageUri: { type: String }, 
         rewardAmount: { type: Number, default: 0 },
         rewardCurrency: { type: String, default: 'USD' },
-        extraDetails: { type: String, trim: true } // E.g., "Last seen wearing a red jacket"
+        extraDetails: { type: String, trim: true } 
     }
 
 }, { timestamps: true });

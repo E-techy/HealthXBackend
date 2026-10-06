@@ -1,161 +1,143 @@
 /**
  * HealthX Emergency Command Center
- * emergencyManager.js
- * 
- * Handles the draggable Emergency Manager window, public discovery search,
- * smooth filtering dropdowns, and emergency creation/joining UI.
+ * emergencyManager.js (UI Only)
  */
 (() => {
     "use strict";
 
-    class EmergencyManager {
+    class EmergencyManagerUI {
         constructor() {
-            this.container = null;
             this.initialized = false;
-            
-            // State
-            this.activeTab = 'discover';
+            this.isVisible = false;
             this.emergencies = [];
-            this.currentLocation = { lat: 28.6139, lng: 77.2090 }; // Default fallback (New Delhi)
-            
-            // Filters State
-            this.activeFilters = {
-                radius: 50 // Default 50km radius
-            };
-
-            // Pre-built dropdown suggestions (Mock data for the smooth dropdown)
-            this.filterSuggestions = {
-                state: ['Delhi', 'Jharkhand', 'Maharashtra', 'Karnataka'],
-                city: ['New Delhi', 'Ranchi', 'Mumbai', 'Bangalore', 'Indore'],
-                country: ['India', 'USA', 'UK']
-            };
+            this.selectedGps = { lat: null, lng: null };
+            this.activeFilters = { radius: 50 }; // Default 50km
         }
 
         init() {
             if (this.initialized) return;
-            console.log("🚀 [EmergencyManager] Initializing UI...");
-
             this.injectHTML();
             this.cacheElements();
             this.bindDragEvents();
             this.bindUIEvents();
-            this.getUserLocation();
-            this.renderFilterPills();
             
+            // Trigger background fetch for countries
+            window.emergencyAPI.fetchGlobalCountries();
             this.initialized = true;
         }
 
-        // ======================================================================
-        // 1. SHELL INJECTION & CACHING
-        // ======================================================================
         injectHTML() {
             const html = `
                 <div id="em-manager-window" class="em-floating-window hidden">
-                    <!-- Header -->
                     <div class="em-header" id="em-drag-handle">
                         <span class="em-title">Emergency Operations</span>
                         <button class="em-close-btn" id="em-btn-close">×</button>
                     </div>
-                    
-                    <!-- Tabs -->
                     <div class="em-tabs">
                         <button class="em-tab-btn active" data-tab="discover">Discover</button>
-                        <button class="em-tab-btn" data-tab="manage">Create / Manage</button>
+                        <button class="em-tab-btn" data-tab="manage">Create Incident</button>
                     </div>
                     
-                    <!-- Content Area -->
                     <div class="em-content-area">
-                        
-                        <!-- VIEW: DISCOVER -->
+                        <!-- TAB: DISCOVER -->
                         <div id="em-view-discover" class="em-view active">
-                            <!-- Search & Dropdown -->
-                            <div class="em-dropdown-wrapper">
-                                <div class="em-search-bar">
-                                    <select id="em-filter-type" class="em-search-input" style="max-width: 120px;">
-                                        <option value="city">City</option>
-                                        <option value="state">State</option>
-                                        <option value="country">Country</option>
-                                        <option value="radius">Radius (km)</option>
-                                        <option value="startDate">Date (From)</option>
-                                    </select>
-                                    <input type="text" id="em-filter-input" class="em-search-input" placeholder="Type to search or add custom...">
-                                    <button id="em-btn-add-filter" class="em-btn em-btn-primary">Add</button>
+                            <div class="em-search-bar">
+                                <select id="em-filter-type" class="em-search-input" style="max-width: 110px;">
+                                    <option value="country">Country</option>
+                                    <option value="state">State</option>
+                                    <option value="city">City</option>
+                                    <option value="radius">Radius (km)</option>
+                                    <option value="startDate">Date (From)</option>
+                                </select>
+                                <div class="em-autocomplete-anchor" style="flex:1;">
+                                    <input type="text" id="em-filter-input" class="em-search-input" style="width:100%;" placeholder="Select location filter...">
+                                    <div id="em-filter-dropdown" class="em-global-dropdown"></div>
                                 </div>
-                                <!-- Smooth Dropdown Menu -->
-                                <div id="em-smooth-dropdown" class="em-dropdown-menu">
-                                    <div id="em-dropdown-list" class="em-dropdown-list"></div>
-                                </div>
+                                <button id="em-btn-add-filter" class="em-btn em-btn-primary">Add</button>
                             </div>
-
-                            <!-- Active Filters -->
+                            
                             <div id="em-active-filters" class="em-active-filters"></div>
-
-                            <!-- Search Button -->
-                            <button id="em-btn-search" class="em-btn em-btn-primary" style="width: 100%;">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-                                Search Public Emergencies
-                            </button>
-
-                            <!-- List / Detail Container -->
+                            <button id="em-btn-search" class="em-btn em-btn-primary" style="width: 100%;">🔍 Search Public Emergencies</button>
                             <div id="em-results-container" class="em-list-container">
-                                <!-- Default Empty State -->
-                                <div class="em-empty-state">
-                                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 2"/></svg>
-                                    <p>Apply filters and hit search to discover active incidents near you.</p>
-                                </div>
+                                <div class="em-empty-state">Apply filters to search global incidents.</div>
                             </div>
                         </div>
 
-                        <!-- VIEW: CREATE / MANAGE -->
+                        <!-- TAB: CREATE -->
                         <div id="em-view-manage" class="em-view">
                             <form id="em-create-form">
                                 <div class="em-form-group">
                                     <label>Incident Title</label>
-                                    <input type="text" id="em-create-title" required placeholder="e.g. Missing Person - Sector 4">
+                                    <input type="text" id="em-create-title" required placeholder="e.g. Lost Hiker">
                                 </div>
                                 <div class="em-form-group">
                                     <label>Description</label>
-                                    <textarea id="em-create-desc" placeholder="Details about the incident..."></textarea>
+                                    <textarea id="em-create-desc" placeholder="Provide full context..."></textarea>
                                 </div>
-                                <div class="em-form-row">
-                                    <div class="em-form-group">
-                                        <label>City</label>
-                                        <input type="text" id="em-create-city">
-                                    </div>
-                                    <div class="em-form-group">
-                                        <label>State</label>
-                                        <input type="text" id="em-create-state">
-                                    </div>
-                                </div>
+
+                                <!-- GPS Picker -->
                                 <div class="em-form-group">
-                                    <label>Passcode (Optional)</label>
-                                    <input type="password" id="em-create-pass" placeholder="Leave blank for open access">
+                                    <label>Incident GPS Coordinates</label>
+                                    <div class="em-gps-row">
+                                        <input type="text" id="em-create-lat" class="em-gps-input" placeholder="Lat" readonly required>
+                                        <input type="text" id="em-create-lng" class="em-gps-input" placeholder="Lng" readonly required>
+                                    </div>
+                                    <div class="em-gps-row">
+                                        <button type="button" id="em-btn-gps-current" class="em-gps-btn">📍 Current Loc</button>
+                                        <button type="button" id="em-btn-gps-map" class="em-gps-btn">🗺️ Pick on Map</button>
+                                    </div>
+                                </div>
+
+                                <!-- Dynamic Location -->
+                                <div class="em-form-row">
+                                    <div class="em-form-group em-autocomplete-anchor">
+                                        <label>Country</label>
+                                        <input type="text" id="em-create-country" placeholder="Select..." autocomplete="off">
+                                        <div id="em-create-country-drop" class="em-global-dropdown"></div>
+                                    </div>
+                                    <div class="em-form-group em-autocomplete-anchor">
+                                        <label>State</label>
+                                        <input type="text" id="em-create-state" placeholder="Select..." autocomplete="off" disabled>
+                                        <div id="em-create-state-drop" class="em-global-dropdown"></div>
+                                    </div>
+                                </div>
+                                <div class="em-form-group em-autocomplete-anchor">
+                                    <label>City</label>
+                                    <input type="text" id="em-create-city" placeholder="Select..." autocomplete="off" disabled>
+                                    <div id="em-create-city-drop" class="em-global-dropdown"></div>
+                                </div>
+
+                                <div class="em-form-group">
+                                    <label>Access Passcode (Optional)</label>
+                                    <input type="password" id="em-create-pass" placeholder="Blank for open access">
                                 </div>
                                 <label class="em-checkbox-group">
                                     <input type="checkbox" id="em-create-public" checked>
-                                    List globally in Public Discovery Search
+                                    Allow Public Discovery
                                 </label>
+
                                 <hr style="border:0; border-top:1px solid var(--border-panel); margin: 10px 0;">
-                                <div style="font-size: 11px; font-weight:700; color:var(--text-muted); margin-bottom: 10px; text-transform:uppercase;">Victim Metadata (Optional)</div>
+                                <div style="font-size: 11px; font-weight:700; color:var(--text-muted); margin-bottom: 10px;">VICTIM METADATA (OPTIONAL)</div>
                                 <div class="em-form-row">
-                                    <div class="em-form-group">
-                                        <label>Victim Name</label>
-                                        <input type="text" id="em-victim-name">
-                                    </div>
-                                    <div class="em-form-group">
-                                        <label>Reward (USD)</label>
-                                        <input type="number" id="em-victim-reward" value="0">
-                                    </div>
+                                    <div class="em-form-group"><label>Name</label><input type="text" id="em-vic-name"></div>
+                                    <div class="em-form-group"><label>Age</label><input type="number" id="em-vic-age"></div>
+                                </div>
+                                <div class="em-form-row">
+                                    <div class="em-form-group"><label>Gender</label><input type="text" id="em-vic-gender"></div>
+                                    <div class="em-form-group"><label>Reward (USD)</label><input type="number" id="em-vic-reward" value="0"></div>
+                                </div>
+                                <div class="em-form-group">
+                                    <label>Photo URL</label>
+                                    <input type="text" id="em-vic-photo" placeholder="https://...">
                                 </div>
                                 <label class="em-checkbox-group">
-                                    <input type="checkbox" id="em-victim-public">
-                                    Make Victim Details Public
+                                    <input type="checkbox" id="em-vic-public">
+                                    Make Victim Info Publicly Visible
                                 </label>
                                 
-                                <button type="submit" class="em-btn em-btn-primary" style="width: 100%; margin-top: 10px;">Initialize Emergency</button>
+                                <button type="submit" class="em-btn em-btn-primary" style="width: 100%; margin-top: 15px;">Create Emergency</button>
                             </form>
                         </div>
-
                     </div>
                 </div>
             `;
@@ -168,292 +150,279 @@
             this.btnClose = document.getElementById('em-btn-close');
             this.tabBtns = document.querySelectorAll('.em-tab-btn');
             
-            // Discover View Elements
+            // Search
             this.filterTypeSel = document.getElementById('em-filter-type');
             this.filterInput = document.getElementById('em-filter-input');
+            this.filterDropdown = document.getElementById('em-filter-dropdown');
             this.btnAddFilter = document.getElementById('em-btn-add-filter');
             this.activeFiltersDiv = document.getElementById('em-active-filters');
-            this.smoothDropdown = document.getElementById('em-smooth-dropdown');
-            this.dropdownList = document.getElementById('em-dropdown-list');
             this.btnSearch = document.getElementById('em-btn-search');
             this.resultsContainer = document.getElementById('em-results-container');
             
-            // Create View Elements
+            // Create
             this.createForm = document.getElementById('em-create-form');
+            this.latInput = document.getElementById('em-create-lat');
+            this.lngInput = document.getElementById('em-create-lng');
+            this.btnGpsCurrent = document.getElementById('em-btn-gps-current');
+            this.btnGpsMap = document.getElementById('em-btn-gps-map');
+            
+            this.inpCountry = document.getElementById('em-create-country');
+            this.inpState = document.getElementById('em-create-state');
+            this.inpCity = document.getElementById('em-create-city');
+            this.dropCountry = document.getElementById('em-create-country-drop');
+            this.dropState = document.getElementById('em-create-state-drop');
+            this.dropCity = document.getElementById('em-create-city-drop');
         }
 
-        // ======================================================================
-        // 2. WINDOW VISIBILITY & DRAGGING
-        // ======================================================================
-        show() {
+        // --- Toggle & Drag ---
+        toggle() {
             if (!this.initialized) this.init();
-            this.container.classList.remove('hidden');
-            console.log("👁️ [EmergencyManager] Window opened.");
-        }
-
-        hide() {
-            if (this.container) this.container.classList.add('hidden');
-            console.log("🙈 [EmergencyManager] Window hidden.");
+            if (this.isVisible) {
+                this.container.classList.add('hidden');
+                this.isVisible = false;
+            } else {
+                this.container.classList.remove('hidden');
+                this.isVisible = true;
+                this.renderFilterPills();
+            }
         }
 
         bindDragEvents() {
             let isDragging = false, startX, startY, initialLeft, initialTop;
-
             this.dragHandle.addEventListener('mousedown', (e) => {
-                if (e.target === this.btnClose) return; // Don't drag if clicking close
+                if (e.target === this.btnClose) return;
                 isDragging = true;
-                startX = e.clientX;
-                startY = e.clientY;
+                startX = e.clientX; startY = e.clientY;
                 const rect = this.container.getBoundingClientRect();
-                initialLeft = rect.left;
-                initialTop = rect.top;
-                this.container.style.transition = 'none'; // Disable smooth transition while dragging
+                initialLeft = rect.left; initialTop = rect.top;
+                this.container.style.transition = 'none';
             });
-
             document.addEventListener('mousemove', (e) => {
                 if (!isDragging) return;
-                const dx = e.clientX - startX;
-                const dy = e.clientY - startY;
-                this.container.style.left = `${initialLeft + dx}px`;
-                this.container.style.top = `${initialTop + dy}px`;
+                this.container.style.left = `${initialLeft + (e.clientX - startX)}px`;
+                this.container.style.top = `${initialTop + (e.clientY - startY)}px`;
             });
-
             document.addEventListener('mouseup', () => {
                 if (isDragging) {
                     isDragging = false;
                     this.container.style.transition = 'opacity 0.2s ease, transform 0.2s ease, visibility 0.2s ease';
                 }
             });
-            
-            this.btnClose.addEventListener('click', () => this.hide());
+            this.btnClose.addEventListener('click', () => this.toggle());
         }
 
-        // ======================================================================
-        // 3. UI EVENTS (Tabs, Smooth Dropdown, Filters)
-        // ======================================================================
+        // --- Autocomplete Factory ---
+        attachAutocomplete(inputEl, dropdownEl, dataArrayGetter, onSelectCallback) {
+            inputEl.addEventListener('input', (e) => {
+                const val = e.target.value.toLowerCase();
+                const dataset = dataArrayGetter() || [];
+                const matches = dataset.filter(item => item.toLowerCase().includes(val)).slice(0, 10);
+                
+                if (matches.length > 0 && val !== '') {
+                    dropdownEl.innerHTML = matches.map(m => `<div class="em-global-item">${m}</div>`).join('');
+                    dropdownEl.classList.add('active');
+                } else {
+                    dropdownEl.classList.remove('active');
+                }
+            });
+
+            dropdownEl.addEventListener('click', (e) => {
+                if (e.target.classList.contains('em-global-item')) {
+                    inputEl.value = e.target.textContent;
+                    dropdownEl.classList.remove('active');
+                    if (onSelectCallback) onSelectCallback(inputEl.value);
+                }
+            });
+
+            document.addEventListener('click', (e) => {
+                if (e.target !== inputEl) dropdownEl.classList.remove('active');
+            });
+        }
+
         bindUIEvents() {
-            // Tab Switching
+            // Tabs
             this.tabBtns.forEach(btn => {
                 btn.addEventListener('click', (e) => {
                     this.tabBtns.forEach(b => b.classList.remove('active'));
                     e.target.classList.add('active');
-                    
                     document.querySelectorAll('.em-view').forEach(v => v.classList.remove('active'));
                     document.getElementById(`em-view-${e.target.dataset.tab}`).classList.add('active');
                 });
             });
 
-            // Filter Type Change (Reset input and change type)
+            // --- CREATE FORM LOCATION BINDINGS ---
+            this.attachAutocomplete(this.inpCountry, this.dropCountry, () => window.emergencyAPI.locData.countries, async (c) => {
+                this.inpState.value = ''; this.inpCity.value = ''; this.inpCity.disabled = true;
+                await window.emergencyAPI.fetchStatesForCountry(c);
+                this.inpState.disabled = false;
+            });
+            this.attachAutocomplete(this.inpState, this.dropState, () => window.emergencyAPI.locData.states, async (s) => {
+                this.inpCity.value = '';
+                await window.emergencyAPI.fetchCitiesForState(this.inpCountry.value, s);
+                this.inpCity.disabled = false;
+            });
+            this.attachAutocomplete(this.inpCity, this.dropCity, () => window.emergencyAPI.locData.cities);
+
+            // --- SEARCH FILTER BINDINGS ---
             this.filterTypeSel.addEventListener('change', () => {
+                const t = this.filterTypeSel.value;
                 this.filterInput.value = '';
-                this.filterInput.type = this.filterTypeSel.value === 'startDate' ? 'date' : 
-                                        this.filterTypeSel.value === 'radius' ? 'number' : 'text';
-                this.smoothDropdown.classList.remove('active');
-            });
+                
+                if (t === 'radius') this.filterInput.type = 'number';
+                else if (t === 'startDate') this.filterInput.type = 'date';
+                else this.filterInput.type = 'text';
 
-            // Smooth Dropdown Typing Logic
-            this.filterInput.addEventListener('input', (e) => {
-                if (['radius', 'startDate'].includes(this.filterTypeSel.value)) return;
+                // Strip old listeners
+                const newInp = this.filterInput.cloneNode(true);
+                this.filterInput.parentNode.replaceChild(newInp, this.filterInput);
+                this.filterInput = newInp;
                 
-                const val = e.target.value.toLowerCase();
-                const type = this.filterTypeSel.value;
-                const options = this.filterSuggestions[type] || [];
-                
-                const matches = options.filter(opt => opt.toLowerCase().includes(val));
-                
-                if (matches.length > 0) {
-                    this.dropdownList.innerHTML = matches.map(m => `<div class="em-dropdown-item">${m}</div>`).join('');
-                    this.smoothDropdown.classList.add('active');
-                } else {
-                    this.smoothDropdown.classList.remove('active');
+                this.filterInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') { e.preventDefault(); this.filterDropdown.classList.remove('active'); this.addCurrentFilter(); }
+                });
+
+                if (t === 'country') {
+                    this.attachAutocomplete(this.filterInput, this.filterDropdown, () => window.emergencyAPI.locData.countries, (c) => {
+                        this.addCurrentFilter();
+                        window.emergencyAPI.prefetchSearchDataForCountry(c); 
+                    });
+                } else if (t === 'state') {
+                    this.attachAutocomplete(this.filterInput, this.filterDropdown, () => window.emergencyAPI.searchLocData.states, () => this.addCurrentFilter());
+                } else if (t === 'city') {
+                    this.attachAutocomplete(this.filterInput, this.filterDropdown, () => window.emergencyAPI.searchLocData.cities, () => this.addCurrentFilter());
                 }
             });
 
-            // Dropdown Item Click
-            this.dropdownList.addEventListener('click', (e) => {
-                if (e.target.classList.contains('em-dropdown-item')) {
-                    this.filterInput.value = e.target.textContent;
-                    this.smoothDropdown.classList.remove('active');
-                    this.addCurrentFilter();
-                }
+            // Initialize Country Search Autocomplete
+            this.attachAutocomplete(this.filterInput, this.filterDropdown, () => window.emergencyAPI.locData.countries, (c) => {
+                this.addCurrentFilter();
+                window.emergencyAPI.prefetchSearchDataForCountry(c);
             });
 
-            // Hide dropdown when clicking outside
-            document.addEventListener('click', (e) => {
-                if (!e.target.closest('.em-dropdown-wrapper')) {
-                    this.smoothDropdown.classList.remove('active');
-                }
-            });
-
-            // Add Filter Button
-            this.btnAddFilter.addEventListener('click', () => this.addCurrentFilter());
-            
-            // Allow Enter key to add filter
             this.filterInput.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') {
-                    e.preventDefault();
-                    this.smoothDropdown.classList.remove('active');
-                    this.addCurrentFilter();
-                }
+                if (e.key === 'Enter') { e.preventDefault(); this.filterDropdown.classList.remove('active'); this.addCurrentFilter(); }
             });
 
-            // Active Filters Delegation (Remove Filter)
+            this.btnAddFilter.addEventListener('click', () => this.addCurrentFilter());
             this.activeFiltersDiv.addEventListener('click', (e) => {
-                const removeBtn = e.target.closest('.em-pill-remove');
-                if (removeBtn) {
-                    const key = removeBtn.dataset.key;
-                    delete this.activeFilters[key];
-                    console.log(`❌ [EmergencyManager] Filter removed: ${key}`);
+                if (e.target.classList.contains('em-pill-remove')) {
+                    delete this.activeFilters[e.target.dataset.key];
                     this.renderFilterPills();
                 }
             });
 
-            // Main Search Button
-            this.btnSearch.addEventListener('click', () => this.fetchEmergencies());
+            this.btnSearch.addEventListener('click', () => this.executeSearch());
+            this.createForm.addEventListener('submit', (e) => this.handleCreate(e));
 
-            // Create Form Submit
-            this.createForm.addEventListener('submit', (e) => this.handleCreateEmergency(e));
+            // --- GPS BUTTONS FIX ---
+            this.btnGpsCurrent.addEventListener('click', async () => {
+                this.btnGpsCurrent.textContent = "Locating...";
+                try {
+                    // Safe call to your existing Tracker Service
+                    const pos = await window.gpsTracker.getCurrentLocation('em_create_gps');
+                    this.latInput.value = pos.lat.toFixed(6);
+                    this.lngInput.value = pos.lng.toFixed(6);
+                    this.selectedGps = pos;
+                } catch (error) {
+                    if (error.message !== "ABORTED_BY_USER") console.error("GPS Failed:", error);
+                } finally {
+                    this.btnGpsCurrent.textContent = "📍 Current Loc";
+                }
+            });
+
+            this.btnGpsMap.addEventListener('click', () => {
+                if (!window.flatMapEngine || !window.flatMapEngine.map2D) {
+                    alert("Map is not fully loaded yet."); return;
+                }
+                
+                this.toggle(); // Hide UI
+                window.flatMapEngine.map2D.setOptions({ draggableCursor: 'crosshair' });
+                
+                // Listen for a single click on the Google Map
+                google.maps.event.addListenerOnce(window.flatMapEngine.map2D, 'click', (e) => {
+                    const lat = e.latLng.lat();
+                    const lng = e.latLng.lng();
+                    
+                    this.latInput.value = lat.toFixed(6);
+                    this.lngInput.value = lng.toFixed(6);
+                    this.selectedGps = { lat, lng };
+                    
+                    window.flatMapEngine.map2D.setOptions({ draggableCursor: '' }); // Reset cursor
+                    this.toggle(); // Show UI
+                });
+            });
         }
 
-        // ======================================================================
-        // 4. FILTER PILLS LOGIC
-        // ======================================================================
+        // --- Filters & Render ---
         addCurrentFilter() {
-            const key = this.filterTypeSel.value;
             const val = this.filterInput.value.trim();
-            
-            if (!val) return;
-
-            this.activeFilters[key] = val;
-            console.log(`✅ [EmergencyManager] Filter added -> ${key}: ${val}`);
-            
-            this.filterInput.value = '';
-            this.renderFilterPills();
+            if (val) {
+                this.activeFilters[this.filterTypeSel.value] = val;
+                this.filterInput.value = '';
+                this.renderFilterPills();
+            }
         }
 
         renderFilterPills() {
-            this.activeFiltersDiv.innerHTML = '';
-            for (const [key, value] of Object.entries(this.activeFilters)) {
-                let displayVal = value;
-                if (key === 'radius') displayVal = `${value} km`;
-                
-                const pill = document.createElement('div');
-                pill.className = 'em-filter-pill';
-                pill.innerHTML = `
-                    <span>${key.toUpperCase()}: ${displayVal}</span>
-                    <button class="em-pill-remove" data-key="${key}">×</button>
-                `;
-                this.activeFiltersDiv.appendChild(pill);
-            }
-        }
-
-        // ======================================================================
-        // 5. GEOLOCATION & HAERSINE DISTANCE
-        // ======================================================================
-        getUserLocation() {
-            if ("geolocation" in navigator) {
-                navigator.geolocation.getCurrentPosition(
-                    (position) => {
-                        this.currentLocation = {
-                            lat: position.coords.latitude,
-                            lng: position.coords.longitude
-                        };
-                        console.log(`📍 [EmergencyManager] Location acquired: ${this.currentLocation.lat}, ${this.currentLocation.lng}`);
-                    },
-                    (error) => console.warn("Location access denied or failed. Using default.", error)
-                );
-            }
+            this.activeFiltersDiv.innerHTML = Object.entries(this.activeFilters).map(([k, v]) => `
+                <div class="em-filter-pill">
+                    <span>${k.toUpperCase()}: ${v}</span>
+                    <button class="em-pill-remove" data-key="${k}">×</button>
+                </div>
+            `).join('');
         }
 
         calculateDistance(lat1, lon1, lat2, lon2) {
             if (!lat1 || !lon1 || !lat2 || !lon2) return null;
-            const R = 6371; // km
+            const R = 6371; 
             const dLat = (lat2 - lat1) * Math.PI / 180;
             const dLon = (lon2 - lon1) * Math.PI / 180;
-            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-                      Math.sin(dLon/2) * Math.sin(dLon/2);
-            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-            return (R * c).toFixed(1);
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
+            return (R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)))).toFixed(1);
         }
 
-        // ======================================================================
-        // 6. API INTERACTION: DISCOVER & RENDER
-        // ======================================================================
-        async fetchEmergencies() {
-            console.log(`🔍 [EmergencyManager] Fetching with filters:`, this.activeFilters);
-            this.resultsContainer.innerHTML = `<div class="em-empty-state">Searching global networks...</div>`;
+        // --- Search API Call ---
+        async executeSearch() {
+            this.resultsContainer.innerHTML = `<div class="em-empty-state">Searching...</div>`;
+            const filters = { ...this.activeFilters };
+            if (filters.radius && this.selectedGps.lat) {
+                filters.lat = this.selectedGps.lat;
+                filters.lng = this.selectedGps.lng;
+            }
 
-            try {
-                // Build Query String
-                const params = new URLSearchParams(this.activeFilters);
-                // Inject current location if radius is applied
-                if (this.activeFilters.radius) {
-                    params.append('lat', this.currentLocation.lat);
-                    params.append('lng', this.currentLocation.lng);
-                }
+            const data = await window.emergencyAPI.searchEmergencies(filters);
 
-                // Assume window.API_BASE_URL exists, or default to current origin
-                const baseUrl = window.API_BASE_URL || '';
-                const response = await fetch(`${baseUrl}/api/emergency/search?${params.toString()}`);
-                const data = await response.json();
-
-                console.log(`📥 [EmergencyManager] Search Response:`, data);
-
-                if (data.success && data.count > 0) {
-                    this.emergencies = data.data;
-                    this.renderList();
-                } else {
-                    this.resultsContainer.innerHTML = `
-                        <div class="em-empty-state">
-                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>
-                            <p>No active emergencies found matching your criteria.</p>
-                        </div>
-                    `;
-                }
-            } catch (error) {
-                console.error(`💥 [EmergencyManager] Search failed:`, error);
-                this.resultsContainer.innerHTML = `<div class="em-empty-state" style="color:var(--danger)">Error fetching data.</div>`;
+            if (data.success && data.count > 0) {
+                this.emergencies = data.data;
+                this.renderList();
+            } else {
+                this.resultsContainer.innerHTML = `<div class="em-empty-state">No active emergencies found matching criteria.</div>`;
             }
         }
 
         renderList() {
-            this.resultsContainer.innerHTML = '';
-            
-            this.emergencies.forEach((em, index) => {
+            this.resultsContainer.innerHTML = this.emergencies.map((em, i) => {
+                const loc = em.address ? `${em.address.city||''}, ${em.address.country||''}`.replace(/^, | , $/g,'') : 'Unknown';
                 let distHtml = '';
-                if (em.location && em.location.coordinates) {
-                    const dist = this.calculateDistance(
-                        this.currentLocation.lat, this.currentLocation.lng,
-                        em.location.coordinates[1], em.location.coordinates[0]
-                    );
-                    if (dist) distHtml = `<div class="em-card-distance">${dist} km away</div>`;
+                if (em.location?.coordinates && this.selectedGps.lat) {
+                    const dist = this.calculateDistance(this.selectedGps.lat, this.selectedGps.lng, em.location.coordinates[1], em.location.coordinates[0]);
+                    if (dist) distHtml = `<div class="em-card-distance">${dist} km</div>`;
                 }
 
-                const locationStr = em.address ? `${em.address.city || ''}, ${em.address.state || ''}`.replace(/^, | , $/g, '') : 'Unknown Location';
-
-                const card = document.createElement('div');
-                card.className = 'em-card';
-                card.innerHTML = `
+                return `
+                <div class="em-card" onclick="window.EmergencyManager.showDetailView(${i})">
                     <div class="em-card-header">
                         <div class="em-card-title">${em.title}</div>
                         ${distHtml}
                     </div>
-                    <div style="font-size:11px; color:var(--text-muted); font-weight:600;">${locationStr} • ${new Date(em.createdAt).toLocaleDateString()}</div>
-                    <div class="em-card-desc">${em.description || 'No description provided.'}</div>
-                `;
-
-                card.addEventListener('click', () => this.showDetailView(index));
-                this.resultsContainer.appendChild(card);
-            });
+                    <div style="font-size:11px; color:var(--text-muted);">${loc}</div>
+                </div>`;
+            }).join('');
         }
 
         showDetailView(index) {
             const em = this.emergencies[index];
-            console.log(`📄 [EmergencyManager] Opening Details for: ${em.emergencyTrackingId}`);
-
-            const locationStr = em.address ? `${em.address.city || ''}, ${em.address.state || ''}`.replace(/^, | , $/g, '') : 'Unknown Location';
-
+            
             let victimHtml = '';
             if (em.victimMetadata && em.victimMetadata.isPublic) {
                 const img = em.victimMetadata.imageUri || 'https://via.placeholder.com/60?text=NA';
@@ -463,151 +432,84 @@
                         <img src="${img}" class="em-victim-img" alt="Victim">
                         <div class="em-victim-info">
                             <div style="font-size:10px; color:var(--text-muted); text-transform:uppercase; font-weight:700;">Subject of Interest</div>
-                            <div class="em-victim-name">${em.victimMetadata.name || 'Unknown'}</div>
+                            <div class="em-victim-name">${em.victimMetadata.name || 'Unknown'} (Age: ${em.victimMetadata.age || '?'})</div>
+                            <div style="font-size:11px; color:var(--text-muted);">Gender: ${em.victimMetadata.gender || 'Unknown'}</div>
                             <div class="em-victim-reward">${reward}</div>
-                            <div style="font-size:11px; color:var(--text-muted);">${em.victimMetadata.extraDetails || ''}</div>
                         </div>
                     </div>
                 `;
             }
 
-            const isProtected = em.isPasswordProtected ? `
-                <input type="password" id="em-join-pass" placeholder="Enter session passcode">
-            ` : '';
-
             this.resultsContainer.innerHTML = `
-                <div class="em-detail-header">
-                    <button class="em-back-btn" id="em-btn-back">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg>
-                    </button>
-                    <div style="font-weight:700; font-size:14px;">Incident Details</div>
-                </div>
+                <button onclick="window.EmergencyManager.renderList()" class="em-back-btn">← Back to List</button>
+                <h3 style="color:var(--accent); margin:10px 0;">${em.title}</h3>
+                <div style="font-size:12px; color:var(--text-muted); margin-bottom:10px;">ID: ${em.emergencyTrackingId}</div>
+                <p style="font-size:13px;">${em.description}</p>
                 
-                <h3 style="color:var(--accent); margin-bottom: 4px;">${em.title}</h3>
-                <div style="font-size:12px; font-weight:600; color:var(--text-muted); margin-bottom: 10px;">ID: ${em.emergencyTrackingId} • ${locationStr}</div>
-                <div style="font-size:13px; line-height:1.5;">${em.description || 'No detailed description.'}</div>
-
                 ${victimHtml}
 
-                <div style="display:flex; gap:10px; margin-top:15px;">
-                    <button id="em-btn-map" class="em-btn" style="flex:1;">Show on Map</button>
-                </div>
-
                 <div class="em-join-box">
-                    <div style="font-size:12px; font-weight:600;">Join Response Operation</div>
-                    ${isProtected}
-                    <button id="em-btn-join" class="em-btn em-btn-primary">Authenticate & Join</button>
+                    ${em.isPasswordProtected ? '<input type="password" id="em-join-pass" placeholder="Passcode required to join">' : ''}
+                    <button onclick="window.EmergencyManager.triggerJoin('${em.emergencyTrackingId}')" class="em-btn em-btn-primary">Authenticate & Join</button>
                 </div>
             `;
-
-            // Bind Back Button
-            document.getElementById('em-btn-back').addEventListener('click', () => this.renderList());
-
-            // Bind Show on Map
-            document.getElementById('em-btn-map').addEventListener('click', () => {
-                console.log(`🗺️ [EmergencyManager] Action: Show on Map Triggered. Target: ${em.location?.coordinates}`);
-                // TODO: Interface with markerManager to pan map.
-            });
-
-            // Bind Join
-            document.getElementById('em-btn-join').addEventListener('click', () => {
-                const passInput = document.getElementById('em-join-pass');
-                const password = passInput ? passInput.value : null;
-                this.joinEmergency(em.emergencyTrackingId, password);
-            });
         }
 
-        async joinEmergency(trackingId, password) {
-            console.log(`🔑 [EmergencyManager] Attempting to join ${trackingId}...`);
-            
-            try {
-                const baseUrl = window.API_BASE_URL || '';
-                // Assume standard app auth token is stored in localStorage by core/auth.js
-                const appToken = localStorage.getItem('healthx_token'); 
-                const headers = { 'Content-Type': 'application/json' };
-                if (appToken) headers['Authorization'] = `Bearer ${appToken}`;
-
-                const response = await fetch(`${baseUrl}/api/emergency/join/credentials`, {
-                    method: 'POST',
-                    headers: headers,
-                    body: JSON.stringify({ emergencyTrackingId: trackingId, password })
-                });
-
-                const data = await response.json();
-                console.log(`📥 [EmergencyManager] Join Response:`, data);
-
-                if (data.success) {
-                    alert(`Successfully joined ${data.data.title}! Session token acquired.`);
-                    // Save emergency session token for socket connections
-                    localStorage.setItem(`em_token_${trackingId}`, data.data.token);
-                    
-                    // Trigger global event if UI wants to switch to tracking panel automatically
-                    if (window.EventBus) window.EventBus.emit('emergency_joined', data.data);
-                } else {
-                    alert(`Failed to join: ${data.message}`);
-                }
-            } catch (error) {
-                console.error(`💥 [EmergencyManager] Join Request Failed:`, error);
-            }
+        async triggerJoin(id) {
+            const pass = document.getElementById('em-join-pass')?.value || null;
+            const data = await window.emergencyAPI.joinEmergency(id, pass);
+            if (data.success) {
+                alert(`Joined ${data.data.title}!`);
+            } else alert(`Failed: ${data.message}`);
         }
 
-        // ======================================================================
-        // 7. API INTERACTION: CREATE
-        // ======================================================================
-        async handleCreateEmergency(e) {
+        // --- Create API Call ---
+        async handleCreate(e) {
             e.preventDefault();
             
+            if (!window.emergencyAPI.getToken()) {
+                alert("🚨 Authorization Error: You are not logged in. Redirecting to login...");
+                window.location.href = '/emergency/auth.html';
+                return;
+            }
+
+            if (!this.selectedGps.lat || !this.selectedGps.lng) {
+                alert("Please provide GPS coordinates using '📍 Current Loc' or '🗺️ Pick on Map'.");
+                return;
+            }
+
             const payload = {
                 title: document.getElementById('em-create-title').value,
                 description: document.getElementById('em-create-desc').value,
                 password: document.getElementById('em-create-pass').value,
                 isPublicVisibility: document.getElementById('em-create-public').checked,
+                location: this.selectedGps,
                 address: {
-                    city: document.getElementById('em-create-city').value,
-                    state: document.getElementById('em-create-state').value
+                    country: this.inpCountry.value,
+                    state: this.inpState.value,
+                    city: this.inpCity.value
                 },
-                location: this.currentLocation, // Auto-attaching current coordinates
                 victimMetadata: {
-                    isPublic: document.getElementById('em-victim-public').checked,
-                    name: document.getElementById('em-victim-name').value,
-                    rewardAmount: parseFloat(document.getElementById('em-victim-reward').value)
+                    isPublic: document.getElementById('em-vic-public').checked,
+                    name: document.getElementById('em-vic-name').value,
+                    age: parseInt(document.getElementById('em-vic-age').value) || null,
+                    gender: document.getElementById('em-vic-gender').value,
+                    rewardAmount: parseFloat(document.getElementById('em-vic-reward').value) || 0,
+                    imageUri: document.getElementById('em-vic-photo').value
                 }
             };
 
-            console.log(`📤 [EmergencyManager] Creating Emergency Payload:`, payload);
-
-            try {
-                const baseUrl = window.API_BASE_URL || '';
-                const appToken = localStorage.getItem('healthx_token');
-                
-                const response = await fetch(`${baseUrl}/api/emergency/create`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${appToken}` // Requires Authentication
-                    },
-                    body: JSON.stringify(payload)
-                });
-
-                const data = await response.json();
-                console.log(`📥 [EmergencyManager] Create Response:`, data);
-
-                if (data.success) {
-                    alert(`Emergency Initialized! Tracking ID: ${data.data.emergencyTrackingId}`);
-                    this.createForm.reset();
-                    // Switch back to discover tab
-                    this.tabBtns[0].click();
-                } else {
-                    alert(`Error creating emergency: ${data.message}`);
-                }
-            } catch (error) {
-                console.error(`💥 [EmergencyManager] Create Request Failed:`, error);
+            const data = await window.emergencyAPI.createEmergency(payload);
+            if (data && data.success) {
+                alert(`Emergency Created! ID: ${data.data.emergencyTrackingId}`);
+                this.createForm.reset();
+                this.latInput.value = ''; this.lngInput.value = '';
+                this.tabBtns[0].click(); 
+            } else {
+                alert(`Error: ${data ? data.message : 'Network Error'}`);
             }
         }
-
     }
 
-    // Attach to global window scope so buttons in other files can call window.EmergencyManager.show()
-    window.EmergencyManager = new EmergencyManager();
-
+    window.EmergencyManager = new EmergencyManagerUI();
 })();

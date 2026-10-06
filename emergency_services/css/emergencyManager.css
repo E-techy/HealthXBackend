@@ -126,3 +126,19 @@
 
 .em-form-row { display: flex; gap: 10px; }
 .em-form-row .em-form-group { flex: 1; }
+
+
+/* ==============================================================
+   GPS PICKER & LOCATION UI
+   ============================================================== */
+.em-gps-row { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
+.em-gps-input { flex: 1; padding: 8px; background: rgba(127,127,127,0.1); border: 1px solid var(--border-panel); border-radius: 4px; color: var(--text-muted); font-size: 11px; text-align: center; }
+.em-gps-btn { flex: 1; padding: 8px; background: var(--bg-base); border: 1px solid var(--border-panel); border-radius: 4px; color: var(--text-main); font-size: 11px; font-weight: 600; cursor: pointer; transition: 0.2s; display: flex; justify-content: center; align-items: center; gap: 4px; }
+.em-gps-btn:hover { background: var(--border-panel); color: var(--accent); }
+
+/* Reusable Smooth Dropdown Anchor */
+.em-autocomplete-anchor { position: relative; width: 100%; }
+.em-global-dropdown { position: absolute; top: calc(100% + 2px); left: 0; right: 0; background: var(--bg-panel); border: 1px solid var(--border-panel); border-radius: 6px; box-shadow: var(--shadow-solid); max-height: 180px; overflow-y: auto; z-index: 9999; display: none; flex-direction: column; }
+.em-global-dropdown.active { display: flex; }
+.em-global-item { padding: 8px 12px; font-size: 12px; color: var(--text-main); cursor: pointer; border-bottom: 1px solid var(--bg-base); }
+.em-global-item:hover { background: var(--accent); color: #fff; }

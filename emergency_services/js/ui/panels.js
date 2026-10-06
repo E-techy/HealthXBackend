@@ -64,16 +64,16 @@
                 });
             }
 
-             const emManagerBtn = document.getElementById("btn-open-em-manager");
+              // --- UPDATED BLOCK FOR TOGGLE ---
+            const emManagerBtn = document.getElementById("btn-open-em-manager");
             if (emManagerBtn) {
                 emManagerBtn.addEventListener("click", (e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    this.closeAllPanels(); // Close flyouts so they don't overlap
+                    this.closeAllPanels(); // Close standard flyouts
 
-                    // We will create window.EmergencyManager in the next file
                     if (window.EmergencyManager) {
-                        window.EmergencyManager.show();
+                        window.EmergencyManager.toggle(); // <--- Changed from show() to toggle()
                     } else {
                         console.warn("EmergencyManager not loaded yet.");
                     }
