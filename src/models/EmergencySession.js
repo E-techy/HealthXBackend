@@ -2,62 +2,58 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
 const emergencySessionSchema = new mongoose.Schema({
-    emergencyTrackingId: {
-        type: String,
-        required: true,
-        unique: true,
-        index: true,
-        uppercase: true,
-        trim: true
+    emergencyTrackingId: { type: String, required: true, unique: true, index: true, uppercase: true, trim: true },
+    title: { type: String, required: [true, 'Emergency title or incident name is required'], trim: true },
+    description: { type: String, trim: true, default: '' },
+    
+    // Auth & Security
+    passcodeHash: { type: String, default: null },
+    isPasswordProtected: { type: Boolean, default: false },
+    authKey: { type: String, required: true, unique: true, index: true },
+    
+    // Status & ACL
+    status: { type: String, enum: ['ACTIVE', 'PAUSED', 'RESOLVED'], default: 'ACTIVE', index: true },
+    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'UserAuth', required: true },
+    allowedUsers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'UserAuth' }],
+
+    // ==========================================
+    // NEW: PUBLIC DISCOVERY & METADATA
+    // ==========================================
+    
+    isPublicVisibility: { type: Boolean, default: false, index: true },
+
+    // Spatial Indexing for Radius Search
+    location: {
+        type: { type: String, enum: ['Point'], default: 'Point' },
+        coordinates: { type: [Number], default: [0, 0] } // [longitude, latitude]
     },
-    title: {
-        type: String,
-        required: [true, 'Emergency title or incident name is required'],
-        trim: true
+
+    // Regional Filters
+    address: {
+        city: { type: String, trim: true, index: true },
+        state: { type: String, trim: true, index: true },
+        country: { type: String, trim: true, index: true }
     },
-    description: {
-        type: String,
-        trim: true,
-        default: ''
-    },
-    passcodeHash: {
-        type: String,
-        default: null
-    },
-    isPasswordProtected: {
-        type: Boolean,
-        default: false
-    },
-    authKey: {
-        type: String,
-        required: true,
-        unique: true,
-        index: true
-    },
-    status: {
-        type: String,
-        enum: ['ACTIVE', 'PAUSED', 'RESOLVED'],
-        default: 'ACTIVE',
-        index: true
-    },
-    // The Owner / Admin of this emergency
-    createdBy: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'UserAuth',
-        required: true
-    },
-    // Access Control List (ACL). If populated, ONLY these users (and creator) can join.
-    allowedUsers: [{
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'UserAuth'
-    }]
+
+    // Victim / Incident Specific Details
+    victimMetadata: {
+        isPublic: { type: Boolean, default: false }, // If true, details are exposed in public search
+        name: { type: String, trim: true },
+        imageUri: { type: String }, // URL to victim's photo
+        rewardAmount: { type: Number, default: 0 },
+        rewardCurrency: { type: String, default: 'USD' },
+        extraDetails: { type: String, trim: true } // E.g., "Last seen wearing a red jacket"
+    }
+
 }, { timestamps: true });
+
+// Required for Geospatial Radius Searches
+emergencySessionSchema.index({ location: '2dsphere' });
 
 // Pre-save hook: Hash passcode if set or modified
 emergencySessionSchema.pre('save', async function () {
-    if (!this.isModified('passcodeHash') || !this.passcodeHash) {
-        return;
-    }
+    if (!this.isModified('passcodeHash') || !this.passcodeHash) return;
+    
     const salt = await bcrypt.genSalt(10);
     this.passcodeHash = await bcrypt.hash(this.passcodeHash, salt);
     this.isPasswordProtected = true;
