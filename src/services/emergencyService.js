@@ -9,11 +9,7 @@ const alphabet = '0123456789ABCDEFGHJKLMNPQRSTUVWXYZ';
 const generateTrackingPart = customAlphabet(alphabet, 4);
 
 const generateEmergencySessionToken = (emergencyTrackingId, role = 'VIEWER', userId = null) => {
-    return jwt.sign(
-        { emergencyTrackingId, role, userId },
-        process.env.JWT_SECRET || 'healthx_emergency_secret_key',
-        { expiresIn: '24h' }
-    );
+    return jwt.sign({ emergencyTrackingId, role, userId }, process.env.JWT_SECRET, { expiresIn: '24h' });
 };
 
 const checkUserAccess = (emergency, requestingUserId) => {
@@ -28,7 +24,7 @@ const checkUserAccess = (emergency, requestingUserId) => {
 // OWNER ACTIONS
 // ------------------------------------------------------------------
 
-const createEmergency = async ({ title, description, password, userId, baseUrl, isPublicVisibility, location, address, victimMetadata }) => {
+const createEmergency = async ({ title, description, password, userId, baseUrl, isPublicVisibility, location, address, victims, culprits, detailedDocUri }) => {
     const trackingId = `EM-${generateTrackingPart()}-${generateTrackingPart()}`;
     const magicAuthKey = crypto.randomBytes(24).toString('hex');
 
@@ -36,32 +32,30 @@ const createEmergency = async ({ title, description, password, userId, baseUrl, 
         emergencyTrackingId: trackingId,
         title,
         description,
-        passcodeHash: password ? password : null,
+        passcodeHash: password || null,
         authKey: magicAuthKey,
         createdBy: userId,
         allowedUsers: [],
-        isPublicVisibility: isPublicVisibility || false
+        isPublicVisibility: isPublicVisibility || false,
+        detailedDocUri: detailedDocUri || null
     };
 
     if (location && location.lng && location.lat) {
         emergencyData.location = { type: 'Point', coordinates: [location.lng, location.lat] };
     }
     if (address) emergencyData.address = address;
-    if (victimMetadata) emergencyData.victimMetadata = victimMetadata;
+    if (victims && Array.isArray(victims)) emergencyData.victims = victims;
+    if (culprits && Array.isArray(culprits)) emergencyData.culprits = culprits;
 
     const emergency = new EmergencySession(emergencyData);
     await emergency.save();
 
     const hostUrl = baseUrl || 'http://localhost:5001';
-    const shareableLink = `${hostUrl}/emergency/join?trackingId=${trackingId}&authKey=${magicAuthKey}`;
-
     return {
         emergencyTrackingId: emergency.emergencyTrackingId,
         title: emergency.title,
         status: emergency.status,
-        isPasswordProtected: emergency.isPasswordProtected,
-        authKey: emergency.authKey,
-        shareableLink,
+        shareableLink: `${hostUrl}/emergency/join?trackingId=${trackingId}&authKey=${magicAuthKey}`,
         sessionToken: generateEmergencySessionToken(emergency.emergencyTrackingId, 'ADMIN', userId)
     };
 };
@@ -69,36 +63,44 @@ const createEmergency = async ({ title, description, password, userId, baseUrl, 
 const updateEmergencyDetails = async (trackingId, ownerId, updates) => {
     const emergency = await EmergencySession.findOne({ emergencyTrackingId: trackingId.toUpperCase() });
     if (!emergency) throw new Error('Emergency session not found.');
-    if (emergency.createdBy.toString() !== ownerId.toString()) throw new Error('Unauthorized: Only the creator can update details.');
+    if (emergency.createdBy.toString() !== ownerId.toString()) throw new Error('Unauthorized.');
 
-    // Standard updates
     if (updates.title) emergency.title = updates.title;
     if (updates.description !== undefined) emergency.description = updates.description;
     if (updates.isPublicVisibility !== undefined) emergency.isPublicVisibility = updates.isPublicVisibility;
+    if (updates.detailedDocUri !== undefined) emergency.detailedDocUri = updates.detailedDocUri;
     
-    // Geospatial updates
     if (updates.location && updates.location.lng && updates.location.lat) {
         emergency.location = { type: 'Point', coordinates: [updates.location.lng, updates.location.lat] };
     }
-    // Address updates
-    if (updates.address) {
-        emergency.address = { ...emergency.address, ...updates.address };
-    }
-    // Victim updates
-    if (updates.victimMetadata) {
-        emergency.victimMetadata = { ...emergency.victimMetadata, ...updates.victimMetadata };
-    }
+    if (updates.address) emergency.address = { ...emergency.address, ...updates.address };
+    
+    // Completely replace arrays if provided
+    if (updates.victims) emergency.victims = updates.victims;
+    if (updates.culprits) emergency.culprits = updates.culprits;
 
     await emergency.save();
     return emergency;
 };
 
+// --- NEW: LIST MY EMERGENCIES ---
+const getUserEmergencies = async (userId, filters) => {
+    const query = { createdBy: userId };
+
+    if (filters.status) query.status = filters.status.toUpperCase();
+    if (filters.startDate) query.createdAt = { $gte: new Date(filters.startDate) };
+
+    const emergencies = await EmergencySession.find(query)
+        .select('-passcodeHash -authKey') // Hide ultra-sensitive keys
+        .sort({ createdAt: -1 })
+        .lean();
+
+    return emergencies;
+};
+
 const updateEmergencyStatus = async (trackingId, ownerId, status) => {
     const emergency = await EmergencySession.findOne({ emergencyTrackingId: trackingId.toUpperCase() });
-    if (!emergency) throw new Error('Emergency session not found.');
-    if (emergency.createdBy.toString() !== ownerId.toString()) throw new Error('Unauthorized.');
-    if (!['ACTIVE', 'PAUSED', 'RESOLVED'].includes(status)) throw new Error('Invalid status.');
-
+    if (!emergency || emergency.createdBy.toString() !== ownerId.toString()) throw new Error('Unauthorized.');
     emergency.status = status;
     await emergency.save();
     return emergency;
@@ -106,78 +108,57 @@ const updateEmergencyStatus = async (trackingId, ownerId, status) => {
 
 const deleteEmergency = async (trackingId, ownerId) => {
     const emergency = await EmergencySession.findOne({ emergencyTrackingId: trackingId.toUpperCase() });
-    if (!emergency) throw new Error('Emergency session not found.');
-    if (emergency.createdBy.toString() !== ownerId.toString()) throw new Error('Unauthorized.');
-
+    if (!emergency || emergency.createdBy.toString() !== ownerId.toString()) throw new Error('Unauthorized.');
     await emergency.deleteOne();
     return { success: true };
 };
 
 const inviteUsers = async (trackingId, ownerId, userIdsToInvite, baseUrl) => {
-    // ... [existing invite logic remains completely unchanged] ...
     const emergency = await EmergencySession.findOne({ emergencyTrackingId: trackingId.toUpperCase() });
-    if (!emergency) throw new Error('Emergency session not found.');
-    if (emergency.createdBy.toString() !== ownerId.toString()) throw new Error('Unauthorized.');
+    if (!emergency || emergency.createdBy.toString() !== ownerId.toString()) throw new Error('Unauthorized.');
 
     const users = await UserAuth.find({ _id: { $in: userIdsToInvite } });
-    if (!users.length) throw new Error('No valid users found.');
-
     users.forEach(user => {
         if (!emergency.allowedUsers.includes(user._id)) emergency.allowedUsers.push(user._id);
     });
     
     await emergency.save();
-    const hostUrl = baseUrl || 'http://localhost:5001';
-    const shareableLink = `${hostUrl}/emergency/join?trackingId=${trackingId}&authKey=${emergency.authKey}`;
-
-    const emailPromises = users.map(user => {
-        const subject = `HealthX Emergency Alert: ${emergency.title}`;
-        const body = `Incident: ${emergency.title}\nTracking ID: ${trackingId}\nLink: ${shareableLink}`;
-        return sendEmail(user.email, subject, body).catch(e => console.error(e));
-    });
-
-    await Promise.all(emailPromises);
-    return { invitedCount: users.length, updatedAllowedUsers: emergency.allowedUsers };
+    return { invitedCount: users.length };
 };
 
 // ------------------------------------------------------------------
-// PUBLIC DISCOVERY (Search Engine)
+// PUBLIC DISCOVERY
 // ------------------------------------------------------------------
 
 const searchPublicEmergencies = async (filters) => {
-    const query = { isPublicVisibility: true, status: 'ACTIVE' }; // Base filter
+    const query = { isPublicVisibility: true, status: 'ACTIVE' };
 
-    // 1. Geospatial Radius Search
     if (filters.lng && filters.lat && filters.radiusKm) {
         query.location = {
             $near: {$geometry: { type: "Point", coordinates: [parseFloat(filters.lng), parseFloat(filters.lat)] },
-                $maxDistance: parseFloat(filters.radiusKm) * 1000 // Convert km to meters
+                $maxDistance: parseFloat(filters.radiusKm) * 1000
             }
         };
     }
 
-    // 2. Exact Match Filters (State, City, Country)
     if (filters.state) query['address.state'] = { $regex: new RegExp(`^${filters.state}$`, 'i') };
     if (filters.city) query['address.city'] = { $regex: new RegExp(`^${filters.city}$`, 'i') };
     if (filters.country) query['address.country'] = { $regex: new RegExp(`^${filters.country}$`, 'i') };
+    if (filters.startDate) query.createdAt = { $gte: new Date(filters.startDate) };
 
-    // 3. Time Filter (Started after a certain date)
-    if (filters.startDate) {
-        query.createdAt = { $gte: new Date(filters.startDate) };
-    }
-
-    // Fetch the data, excluding secure fields
     let emergencies = await EmergencySession.find(query)
-        .select('emergencyTrackingId title description status isPasswordProtected location address victimMetadata createdAt')
+        .select('-passcodeHash -authKey -allowedUsers')
         .sort({ createdAt: -1 })
         .limit(parseInt(filters.limit) || 50)
-        .lean(); // Use lean() for faster read and easy object manipulation
+        .lean();
 
-    // 4. Sanitize Victim Data (Hide if victimMetadata.isPublic is false)
+    // Sanitize Victims and Culprits for Public
     emergencies = emergencies.map(em => {
-        if (em.victimMetadata && !em.victimMetadata.isPublic) {
-            delete em.victimMetadata; 
-        }
+        if (em.victims) em.victims = em.victims.filter(v => v.isPublic);
+        if (em.culprits) em.culprits = em.culprits.filter(c => c.isPublic);
+        
+        // Hide detailed doc if not public
+        if (!em.isPublicVisibility) em.detailedDocUri = null;
         return em;
     });
 
@@ -185,48 +166,58 @@ const searchPublicEmergencies = async (filters) => {
 };
 
 // ------------------------------------------------------------------
-// PARTICIPANT ACTIONS
+// PARTICIPANT ACTIONS (Join & Get Info)
 // ------------------------------------------------------------------
 
-const authenticateViaAuthKey = async (emergencyTrackingId, authKey, requestingUserId = null) => {
-    // ... [existing logic unchanged] ...
-    const emergency = await EmergencySession.findOne({ emergencyTrackingId: emergencyTrackingId.toUpperCase(), authKey: authKey, status: 'ACTIVE' });
-    if (!emergency) throw new Error('Invalid tracking ID or closed session.');
-    if (!checkUserAccess(emergency, requestingUserId)) throw new Error('Access denied.');
-
+const authenticateViaAuthKey = async (trackingId, authKey, requestingUserId = null) => {
+    const emergency = await EmergencySession.findOne({ emergencyTrackingId: trackingId.toUpperCase(), authKey, status: 'ACTIVE' });
+    if (!emergency || !checkUserAccess(emergency, requestingUserId)) throw new Error('Access denied.');
     const isOwner = requestingUserId && emergency.createdBy.toString() === requestingUserId.toString();
-    return { emergencyTrackingId: emergency.emergencyTrackingId, title: emergency.title, token: generateEmergencySessionToken(emergency.emergencyTrackingId, isOwner ? 'ADMIN' : 'PARTICIPANT', requestingUserId) };
+    return { trackingId, token: generateEmergencySessionToken(trackingId, isOwner ? 'ADMIN' : 'PARTICIPANT', requestingUserId) };
 };
 
-const authenticateViaCredentials = async (emergencyTrackingId, password, requestingUserId = null) => {
-    // ... [existing logic unchanged] ...
-    const emergency = await EmergencySession.findOne({ emergencyTrackingId: emergencyTrackingId.toUpperCase(), status: 'ACTIVE' });
-    if (!emergency) throw new Error('Session not found.');
-    if (!checkUserAccess(emergency, requestingUserId)) throw new Error('Access denied.');
-
+const authenticateViaCredentials = async (trackingId, password, requestingUserId = null) => {
+    const emergency = await EmergencySession.findOne({ emergencyTrackingId: trackingId.toUpperCase(), status: 'ACTIVE' });
+    if (!emergency || !checkUserAccess(emergency, requestingUserId)) throw new Error('Access denied.');
+    
     if (emergency.isPasswordProtected) {
-        if (!password) throw new Error('Passcode required.');
         if (!(await emergency.comparePasscode(password))) throw new Error('Invalid passcode.');
     }
-
     const isOwner = requestingUserId && emergency.createdBy.toString() === requestingUserId.toString();
-    return { emergencyTrackingId: emergency.emergencyTrackingId, title: emergency.title, token: generateEmergencySessionToken(emergency.emergencyTrackingId, isOwner ? 'ADMIN' : 'PARTICIPANT', requestingUserId) };
+    return { title: emergency.title, token: generateEmergencySessionToken(trackingId, isOwner ? 'ADMIN' : 'PARTICIPANT', requestingUserId) };
 };
 
-const getEmergencyPublicInfo = async (emergencyTrackingId) => {
-    const emergency = await EmergencySession.findOne(
-        { emergencyTrackingId: emergencyTrackingId.toUpperCase() },
-        'emergencyTrackingId title description status isPasswordProtected isPublicVisibility address location victimMetadata createdAt'
-    ).lean();
+const getEmergencyPublicInfo = async (trackingId, requestingUserId = null) => {
+    const emergency = await EmergencySession.findOne({ emergencyTrackingId: trackingId.toUpperCase() }).lean();
+    if (!emergency) throw new Error('Emergency not found.');
 
-    if (!emergency) throw new Error('Emergency session not found.');
-    
-    // Protect victim privacy on direct info fetch too
-    if (emergency.victimMetadata && !emergency.victimMetadata.isPublic) {
-        delete emergency.victimMetadata;
-    }
+    const isAuthorized = checkUserAccess(emergency, requestingUserId);
+
+    // If public OR user is authorized, show arrays (filtered by public flag if just a random guest)
+    if (emergency.victims && !isAuthorized) emergency.victims = emergency.victims.filter(v => v.isPublic);
+    if (emergency.culprits && !isAuthorized) emergency.culprits = emergency.culprits.filter(c => c.isPublic);
+
+    // Nullify document link if private and user isn't authorized
+    if (!emergency.isPublicVisibility && !isAuthorized) emergency.detailedDocUri = null;
+
+    delete emergency.passcodeHash;
+    delete emergency.authKey;
 
     return emergency;
+};
+
+// --- NEW: VALIDATE DOC DOWNLOAD ACCESS ---
+const validateDocumentAccess = async (trackingId, requestingUserId) => {
+    const emergency = await EmergencySession.findOne({ emergencyTrackingId: trackingId.toUpperCase() });
+    if (!emergency) throw new Error('Emergency not found.');
+    if (!emergency.detailedDocUri) throw new Error('No document attached.');
+
+    // If emergency is strictly private and user isn't allowed
+    if (!emergency.isPublicVisibility && !checkUserAccess(emergency, requestingUserId)) {
+        throw new Error('Access denied. You do not have permission to view this document.');
+    }
+    
+    return emergency.detailedDocUri;
 };
 
 module.exports = {
@@ -236,7 +227,9 @@ module.exports = {
     deleteEmergency,
     inviteUsers,
     searchPublicEmergencies,
+    getUserEmergencies,
     authenticateViaAuthKey,
     authenticateViaCredentials,
-    getEmergencyPublicInfo
+    getEmergencyPublicInfo,
+    validateDocumentAccess
 };
