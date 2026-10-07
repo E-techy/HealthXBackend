@@ -1,5 +1,5 @@
 /* ==============================================================
-   EMERGENCY MANAGER - DRAGGABLE FLOATING WINDOW
+   EMERGENCY MANAGER - DRAGGABLE & RESIZABLE WINDOW
    ============================================================== */
 
 .em-floating-window {
@@ -16,14 +16,21 @@
     border-radius: 12px;
     z-index: 1000;
     pointer-events: auto;
+    
+    /* NEW: Resizability constraints */
+    resize: both;
     overflow: hidden;
-    transition: opacity 0.2s ease, transform 0.2s ease, visibility 0.2s ease;
+    min-width: 420px;
+    min-height: 400px;
+    max-width: 95vw;
+    max-height: 95vh;
+    
+    transition: opacity 0.2s ease, visibility 0.2s ease;
 }
 
 .em-floating-window.hidden {
     opacity: 0;
     visibility: hidden;
-    transform: translateY(10px) scale(0.98);
     pointer-events: none;
 }
 
@@ -60,7 +67,7 @@
 .em-search-bar { display: flex; gap: 8px; }
 .em-search-input { flex: 1; padding: 10px 12px; border: 1px solid var(--border-panel); border-radius: 8px; background: var(--bg-base); color: var(--text-main); font-size: 13px; outline: none; transition: 0.2s; }
 .em-search-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1); }
-.em-btn { padding: 10px 16px; background: var(--bg-base); border: 1px solid var(--border-panel); border-radius: 8px; color: var(--text-main); font-weight: 600; font-size: 12px; transition: 0.2s; display: flex; align-items: center; justify-content: center; gap: 6px; }
+.em-btn { padding: 10px 16px; background: var(--bg-base); border: 1px solid var(--border-panel); border-radius: 8px; color: var(--text-main); font-weight: 600; font-size: 12px; transition: 0.2s; display: flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; }
 .em-btn:hover { background: var(--border-panel); }
 .em-btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
 .em-btn-primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
@@ -72,35 +79,23 @@
 .em-pill-remove:hover { color: var(--danger); }
 
 /* Custom Smooth Dropdown Menu */
-.em-dropdown-wrapper { position: relative; }
-.em-dropdown-menu { position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: var(--bg-panel); border: 1px solid var(--border-panel); border-radius: 8px; box-shadow: var(--shadow-solid); z-index: 50; display: none; flex-direction: column; max-height: 200px; overflow-y: auto; }
-.em-dropdown-menu.active { display: flex; }
-.em-dropdown-search { padding: 8px; border-bottom: 1px solid var(--border-panel); position: sticky; top: 0; background: var(--bg-panel); }
-.em-dropdown-search input { width: 100%; padding: 6px 10px; border: 1px solid var(--border-panel); border-radius: 4px; font-size: 12px; background: var(--bg-base); color: var(--text-main); outline: none;}
-.em-dropdown-list { display: flex; flex-direction: column; }
-.em-dropdown-item { padding: 8px 12px; font-size: 12px; color: var(--text-main); cursor: pointer; transition: 0.2s; }
-.em-dropdown-item:hover { background: var(--bg-base); color: var(--accent); }
+.em-autocomplete-anchor { position: relative; width: 100%; }
+.em-global-dropdown { position: absolute; top: calc(100% + 2px); left: 0; right: 0; background: var(--bg-panel); border: 1px solid var(--border-panel); border-radius: 6px; box-shadow: var(--shadow-solid); max-height: 180px; overflow-y: auto; z-index: 9999; display: none; flex-direction: column; }
+.em-global-dropdown.active { display: flex; }
+.em-global-item { padding: 8px 12px; font-size: 12px; color: var(--text-main); cursor: pointer; border-bottom: 1px solid var(--bg-base); }
+.em-global-item:hover { background: var(--accent); color: #fff; }
 
 /* ==============================================================
    LIST & DETAIL VIEWS
    ============================================================== */
 .em-list-container { display: flex; flex-direction: column; gap: 10px; }
-
-/* Empty State */
 .em-empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 20px; text-align: center; color: var(--text-muted); gap: 12px; background: var(--bg-base); border-radius: 8px; border: 1px dashed var(--border-panel); }
-
-/* Small Card (List Item) */
 .em-card { padding: 14px; border: 1px solid var(--border-panel); border-radius: 8px; background: var(--bg-panel); cursor: pointer; transition: 0.2s; display: flex; flex-direction: column; gap: 6px; }
 .em-card:hover { border-color: var(--accent); transform: translateY(-2px); box-shadow: var(--shadow-solid); }
 .em-card-header { display: flex; justify-content: space-between; align-items: flex-start; }
 .em-card-title { font-size: 14px; font-weight: 700; color: var(--text-main); }
 .em-card-distance { font-size: 11px; font-weight: 600; color: var(--accent); background: rgba(37,99,235,0.1); padding: 2px 6px; border-radius: 4px; }
 .em-card-desc { font-size: 12px; color: var(--text-muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-
-/* Full Detail View */
-.em-detail-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid var(--border-panel); }
-.em-back-btn { background: transparent; border: none; color: var(--text-muted); cursor: pointer; padding: 4px; display: flex; align-items: center; justify-content: center; border-radius: 4px; }
-.em-back-btn:hover { background: var(--bg-base); color: var(--text-main); }
 
 .em-victim-card { display: flex; gap: 14px; padding: 14px; background: var(--bg-base); border-radius: 8px; margin-top: 10px; }
 .em-victim-img { width: 60px; height: 60px; border-radius: 8px; object-fit: cover; background: var(--border-panel); }
@@ -113,7 +108,7 @@
 .em-join-box input:focus { border-color: var(--accent); }
 
 /* ==============================================================
-   CREATE / UPDATE FORM
+   CREATE / UPDATE FORM & ARRAYS
    ============================================================== */
 .em-form-group { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
 .em-form-group label { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; }
@@ -127,18 +122,33 @@
 .em-form-row { display: flex; gap: 10px; }
 .em-form-row .em-form-group { flex: 1; }
 
+.em-entity-list { display: flex; flex-direction: column; gap: 12px; margin-bottom: 15px; }
+.em-entity-card { background: rgba(127,127,127,0.05); border: 1px solid var(--border-panel); border-radius: 8px; padding: 12px; position: relative; }
+.em-entity-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-weight: 700; font-size: 12px; color: var(--text-main); text-transform: uppercase; }
+.em-entity-remove { background: transparent; border: none; color: var(--danger); cursor: pointer; font-size: 16px; line-height: 1; }
+.em-add-btn { background: var(--bg-base); border: 1px dashed var(--border-panel); color: var(--accent); padding: 8px; border-radius: 6px; font-size: 11px; font-weight: 700; text-transform: uppercase; cursor: pointer; width: 100%; transition: 0.2s; }
+.em-add-btn:hover { background: rgba(37,99,235,0.1); border-color: var(--accent); }
 
 /* ==============================================================
-   GPS PICKER & LOCATION UI
+   GPS PICKER UI & BUTTONS
    ============================================================== */
 .em-gps-row { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
 .em-gps-input { flex: 1; padding: 8px; background: rgba(127,127,127,0.1); border: 1px solid var(--border-panel); border-radius: 4px; color: var(--text-muted); font-size: 11px; text-align: center; }
 .em-gps-btn { flex: 1; padding: 8px; background: var(--bg-base); border: 1px solid var(--border-panel); border-radius: 4px; color: var(--text-main); font-size: 11px; font-weight: 600; cursor: pointer; transition: 0.2s; display: flex; justify-content: center; align-items: center; gap: 4px; }
 .em-gps-btn:hover { background: var(--border-panel); color: var(--accent); }
+.em-btn-clear { background: rgba(220,38,38,0.1); color: var(--danger); border: 1px solid var(--danger); border-radius: 4px; padding: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-weight:bold; }
+.em-btn-clear:hover { background: var(--danger); color: #fff; }
 
-/* Reusable Smooth Dropdown Anchor */
-.em-autocomplete-anchor { position: relative; width: 100%; }
-.em-global-dropdown { position: absolute; top: calc(100% + 2px); left: 0; right: 0; background: var(--bg-panel); border: 1px solid var(--border-panel); border-radius: 6px; box-shadow: var(--shadow-solid); max-height: 180px; overflow-y: auto; z-index: 9999; display: none; flex-direction: column; }
-.em-global-dropdown.active { display: flex; }
-.em-global-item { padding: 8px 12px; font-size: 12px; color: var(--text-main); cursor: pointer; border-bottom: 1px solid var(--bg-base); }
-.em-global-item:hover { background: var(--accent); color: #fff; }
+/* ==============================================================
+   FILE vs LINK MEDIA TOGGLE UI
+   ============================================================== */
+.em-media-toggle { display: flex; gap: 15px; margin-bottom: 8px; font-size: 12px; font-weight: 600; color: var(--text-main); }
+.em-media-toggle label { display: flex; align-items: center; gap: 4px; cursor: pointer; }
+.em-file-wrapper { display: flex; flex-direction: column; gap: 6px; }
+.em-file-input { font-size: 11px; color: var(--text-muted); padding: 6px 0; }
+.em-file-input::file-selector-button { background: var(--bg-base); color: var(--text-main); border: 1px solid var(--border-panel); padding: 4px 8px; border-radius: 4px; margin-right: 10px; cursor: pointer; font-size: 10px; font-weight: 600; }
+.em-file-selected-badge { display: flex; align-items: center; justify-content: space-between; background: rgba(5, 150, 105, 0.1); border: 1px solid var(--success); color: var(--success); padding: 8px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; }
+.em-remove-file-btn { background: transparent; border: none; color: var(--danger); cursor: pointer; font-weight: bold; font-size: 14px; }
+
+/* Specific Marker Map Popup Delete Button */
+.marker-delete-btn { background: var(--danger); color: #fff; border: none; padding: 4px 8px; border-radius: 4px; font-size: 10px; font-weight: bold; cursor: pointer; width: 100%; margin-top: 6px; }
