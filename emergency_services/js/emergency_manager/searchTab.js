@@ -1,3 +1,7 @@
+/**
+ * searchTab.js
+ * Upgraded: Distance formatting fixes, No Enter-submit, and robust cascading locations.
+ */
 (() => {
     "use strict";
 
@@ -5,7 +9,7 @@
         constructor() {
             this.activeFilters = { radius: 50 }; // Default 50km
             this.emergencies = [];
-            this.lastSearchGps = null; // Stores GPS ONLY when Search is clicked
+            this.lastSearchGps = null;
         }
 
         init() {
@@ -89,14 +93,21 @@
                 else if (t === 'startDate') this.filterInput.type = 'date';
                 else this.filterInput.type = 'text';
 
+                // Clone input to strip old listeners
                 const newInp = this.filterInput.cloneNode(true);
                 this.filterInput.parentNode.replaceChild(newInp, this.filterInput);
                 this.filterInput = newInp;
                 
+                // Allow enter key ONLY to add filter, not submit form
                 this.filterInput.addEventListener('keypress', (e) => {
-                    if (e.key === 'Enter') { e.preventDefault(); this.filterDropdown.classList.remove('active'); this.addCurrentFilter(); }
+                    if (e.key === 'Enter') { 
+                        e.preventDefault(); 
+                        this.filterDropdown.classList.remove('active'); 
+                        this.addCurrentFilter(); 
+                    }
                 });
 
+                // Attach proper dataset based on selection type
                 if (t === 'country') {
                     this.attachAutocomplete(this.filterInput, this.filterDropdown, () => window.EmAPI.locData?.countries, (c) => {
                         this.addCurrentFilter();
@@ -109,10 +120,15 @@
                 }
             });
 
-            // Init country
+            // Init country on first load
             this.attachAutocomplete(this.filterInput, this.filterDropdown, () => window.EmAPI.locData?.countries, (c) => {
                 this.addCurrentFilter();
                 window.EmAPI.prefetchSearchDataForCountry(c);
+            });
+
+            // Allow initial enter key binding
+            this.filterInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') { e.preventDefault(); this.filterDropdown.classList.remove('active'); this.addCurrentFilter(); }
             });
 
             this.btnAddFilter.addEventListener('click', () => this.addCurrentFilter());
@@ -125,7 +141,6 @@
             });
 
             this.btnSearch.addEventListener('click', () => this.executeSearch());
-            
             this.renderFilterPills();
         }
 
@@ -162,7 +177,6 @@
             
             const filters = { ...this.activeFilters };
             
-            // Explicitly fetch GPS at the EXACT moment of search
             if (filters.radius) {
                 try {
                     console.log("📍 [SearchTab] Fetching current device GPS for Radius Search...");
@@ -192,7 +206,6 @@
                 const loc = em.address ? `${em.address.city||''}, ${em.address.country||''}`.replace(/^, | , $/g,'') : 'Unknown';
                 let distHtml = '';
                 
-                // Show straight-line radius distance
                 if (em.location?.coordinates && this.lastSearchGps?.lat) {
                     const dist = this.calculateDistance(this.lastSearchGps.lat, this.lastSearchGps.lng, em.location.coordinates[1], em.location.coordinates[0]);
                     if (dist) distHtml = `<div class="em-card-distance">Within ${dist} km radius</div>`;
@@ -212,7 +225,6 @@
         showDetailView(index) {
             const em = this.emergencies[index];
             
-            // Build Victims UI
             const victimsHtml = (em.victims || []).map(v => `
                 <div class="em-victim-card">
                     <img src="${v.primaryImage || 'https://via.placeholder.com/60?text=NA'}" class="em-victim-img" alt="Victim">
@@ -226,7 +238,6 @@
                 </div>
             `).join('');
 
-            // Build Culprits UI
             const culpritsHtml = (em.culprits || []).map(c => `
                 <div class="em-victim-card" style="border-left: 3px solid var(--danger);">
                     <img src="${c.primaryImage || 'https://via.placeholder.com/60?text=NA'}" class="em-victim-img" alt="Culprit">
